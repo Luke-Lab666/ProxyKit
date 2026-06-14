@@ -5,7 +5,7 @@
 #!arguments-desc=PANEL_NAME: 面板名称\nDISMISS: 通知自动消失秒数\nFLUSH_DNS: 打断前是否刷新 DNS，1 开启，0 关闭\nICON: 面板图标\nICON-COLOR: 图标颜色
 
 [Script]
-{{{PANEL_NAME}}} = type=generic,timeout=10,script-path=https://raw.githubusercontent.com/Obliviate1/OUT/refs/heads/main/kill-connections-lite.js,argument="DISMISS={{{DISMISS}}}&FLUSH_DNS={{{FLUSH_DNS}}}&ICON={{{ICON}}}&ICON-COLOR={{{ICON-COLOR}}}",engine=jsc
+{{{PANEL_NAME}}} = type=generic,timeout=10,script-path=https://raw.githubusercontent.com/Luke-Lab666/OUT/refs/heads/main/kill-connections-lite.js,argument="DISMISS={{{DISMISS}}}&FLUSH_DNS={{{FLUSH_DNS}}}&ICON={{{ICON}}}&ICON-COLOR={{{ICON-COLOR}}}",engine=jsc
 
 [Panel]
 {{{PANEL_NAME}}} = script-name={{{PANEL_NAME}}},update-interval=3600
