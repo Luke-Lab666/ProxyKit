@@ -15,32 +15,21 @@ ProxyKit
   <img src="https://img.shields.io/badge/personal-config-8b5cf6?style=flat-square&labelColor=1f2937" />
 </p>
 </div>
+<br>
 <hr>
-<table width="100%">
-  <tr>
-    <td width="33.33%" align="center">
-      <strong>Rule</strong>
-      <br>
-      <sub>分流规则</sub>
-    </td>
-    <td width="33.33%" align="center">
-      <strong>Scripts</strong>
-      <br>
-      <sub>脚本配置</sub>
-    </td>
-    <td width="33.33%" align="center">
-      <strong>SurgeModule</strong>
-      <br>
-      <sub>模块配置</sub>
-    </td>
-  </tr>
-</table>
+<br>
+
+Rules	Scripts	Modules
+分流规则	脚本配置	模块配置
+
+<br>
 <hr>
 
 🚀 Usage
 
 打开对应文件，复制 Raw 链接，按需添加到客户端使用。
 
+<br>
 <hr>
 
 📝 Note
@@ -48,6 +37,7 @@ ProxyKit
 本仓库主要用于个人网络环境的配置备份与日常维护。
 内容会根据实际使用情况调整，不作为通用方案推荐。
 
+<br>
 <hr>
 <div align="center">
 
