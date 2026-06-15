@@ -91,7 +91,7 @@
     .dot {
       width: 8px;
       height: 8px;
-      border-radius: 99px;
+      border-radius: 999px;
       background: var(--green);
       box-shadow: 0 0 0 5px rgba(34, 197, 94, 0.12);
       flex-shrink: 0;
@@ -140,10 +140,6 @@
       color: #fff;
       background: var(--blue);
     }
-    .badge.violet span:last-child {
-      color: #fff;
-      background: var(--violet);
-    }
     .actions {
       display: flex;
       justify-content: center;
@@ -162,6 +158,14 @@
       border: 1px solid var(--border);
       background: #fff;
       box-shadow: 0 12px 36px rgba(15, 23, 42, 0.06);
+      transition:
+        transform 0.18s ease,
+        border-color 0.18s ease,
+        background 0.18s ease;
+    }
+    .button:hover {
+      transform: translateY(-2px);
+      border-color: rgba(15, 23, 42, 0.2);
     }
     .button.primary {
       color: #fff;
@@ -399,7 +403,7 @@
     <section class="hero">
       <div class="eyebrow">
         <span class="dot"></span>
-        个人维护中
+        随缘维护
       </div>
   <h1>ProxyKit</h1>
   <p class="subtitle">
@@ -436,71 +440,30 @@
   <script>
     const repo = "Luke-Lab666/ProxyKit";
     const branch = "main";
-    const categories = [
-      {
-        title: "Rules",
-        desc: "分流规则、域名规则、IP 规则。",
-        icon: "R",
-        iconClass: "rules",
-        folder: "Rule"
-      },
-      {
-        title: "Scripts",
-        desc: "JavaScript 脚本配置。",
-        icon: "JS",
-        iconClass: "scripts",
-        folder: "Scripts"
-      },
-      {
-        title: "Modules",
-        desc: "Surge 模块与相关配置。",
-        icon: "M",
-        iconClass: "modules",
-        folder: "SurgeModule"
-      }
-    ];
-    const fallbackFiles = [
-      "Rule/APNs",
-      "Rule/AppleCN",
-      "Rule/AppleFull",
-      "Rule/Emby",
-      "Rule/GeoIP",
-      "Rule/Net-Info-D",
-      "Rule/Net-Info-G",
-      "Rule/NotGeoIP",
-      "Rule/REJECT",
-      "Rule/Telegram",
-      "Scripts/dns-lite.js",
-      "Scripts/kill-connections-lite.js",
-      "SurgeModule/DNS Lite",
-      "SurgeModule/kill-connections-lite.sgmodule"
-    ];
     const menu = document.getElementById("menu");
+    const escapeHtml = (value) => {
+      return String(value)
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#039;");
+    };
     const encodePath = (path) => {
-      return path.split("/").map(encodeURIComponent).join("/");
+      return String(path).split("/").map(encodeURIComponent).join("/");
     };
     const getRawUrl = (path) => {
       return `https://raw.githubusercontent.com/${repo}/${branch}/${encodePath(path)}`;
     };
-    const getFileName = (path) => {
-      return path.split("/").pop();
-    };
-    const sortFiles = (files) => {
-      return files.sort((a, b) => {
-        return a.localeCompare(b, "zh-CN", {
-          numeric: true,
-          sensitivity: "base"
-        });
-      });
-    };
-    const renderFile = (path) => {
+    const renderFile = (file) => {
+      const path = file.path;
+      const name = file.name || String(path).split("/").pop();
       const raw = getRawUrl(path);
-      const name = getFileName(path);
       return `
         <div class="file">
           <a href="${raw}" target="_blank" rel="noopener">
-            <span class="file-title">${name}</span>
-            <span class="file-path">${path}</span>
+            <span class="file-title">${escapeHtml(name)}</span>
+            <span class="file-path">${escapeHtml(path)}</span>
           </a>
           <div class="file-actions">
             <a class="mini raw" href="${raw}" target="_blank" rel="noopener">Raw</a>
@@ -509,13 +472,18 @@
         </div>
       `;
     };
-    const renderMenu = (allFiles) => {
+    const renderMenu = (categories) => {
+      if (!Array.isArray(categories) || categories.length === 0) {
+        menu.innerHTML = `
+          <section class="note">
+            <h2>⚠️ 暂无数据</h2>
+            <p>没有读取到可显示的文件列表。</p>
+          </section>
+        `;
+        return;
+      }
       menu.innerHTML = categories.map((category) => {
-        const files = sortFiles(
-          allFiles.filter((path) => {
-            return path.startsWith(`${category.folder}/`);
-          })
-        );
+        const files = Array.isArray(category.files) ? category.files : [];
         const fileList = files.length
           ? files.map(renderFile).join("")
           : `<div class="empty">这个分类暂时没有可显示的文件。</div>`;
@@ -523,10 +491,12 @@
           <details class="category">
             <summary>
               <div class="category-head">
-                <div class="icon ${category.iconClass}">${category.icon}</div>
+                <div class="icon ${escapeHtml(category.iconClass || "")}">
+                  ${escapeHtml(category.icon || "")}
+                </div>
                 <div>
-                  <h2 class="category-title">${category.title}</h2>
-                  <p class="category-desc">${category.desc}</p>
+                  <h2 class="category-title">${escapeHtml(category.title || "")}</h2>
+                  <p class="category-desc">${escapeHtml(category.desc || "")}</p>
                 </div>
                 <div class="chevron" aria-hidden="true"></div>
               </div>
@@ -558,27 +528,21 @@
     };
     const loadFiles = async () => {
       try {
-        const url = `https://api.github.com/repos/${repo}/git/trees/${branch}?recursive=1`;
-        const response = await fetch(url, {
-          headers: {
-            Accept: "application/vnd.github+json"
-          }
+        const response = await fetch(`./files.json?v=${Date.now()}`, {
+          cache: "no-store"
         });
         if (!response.ok) {
-          throw new Error("GitHub API request failed");
+          throw new Error("Failed to load files.json");
         }
         const data = await response.json();
-        const files = data.tree
-          .filter((item) => item.type === "blob")
-          .map((item) => item.path)
-          .filter((path) => {
-            return categories.some((category) => {
-              return path.startsWith(`${category.folder}/`);
-            });
-          });
-        renderMenu(files);
+        renderMenu(data);
       } catch {
-        renderMenu(fallbackFiles);
+        menu.innerHTML = `
+          <section class="note">
+            <h2>⚠️ 加载失败</h2>
+            <p>文件列表读取失败，请确认 docs/files.json 已生成。</p>
+          </section>
+        `;
       }
     };
     loadFiles();
