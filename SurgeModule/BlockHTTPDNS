@@ -5,6 +5,9 @@
 #!tag=DNS
 #!date=2026-06-19
 
+[General]
+force-http-engine-hosts = %APPEND% 119.29.29.29:80, 182.254.116.116:80, 203.107.1.1:80, 203.107.1.33:80, 203.107.1.66:80, 203.107.1.67:80, 203.107.1.97:80, dns.weixin.qq.com:80, dns.weixin.qq.com:8080, dns.weixin.qq.com:443, aedns.weixin.qq.com:80, aedns.weixin.qq.com:443, httpdns.alicdn.com:80, httpdns.alicdn.com:443, httpdns-api.aliyuncs.com:80, httpdns-api.aliyuncs.com:443
+
 [Rule]
 # ================================
 # Generic Catch
