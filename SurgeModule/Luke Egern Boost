@@ -1,0 +1,177 @@
+name: "Luke Egern Boost"
+description: "Egern 通用增强模块：优化大陆网络、局域网、Fake-IP、HTTPDNS 劫持、游戏/投屏/路由器访问体验。"
+author: "Luke-Lab666"
+icon: "network"
+
+# ================================
+# Tunnel Bypass
+# 不进隧道，直接交给系统网络处理
+# 重点解决：路由器后台、局域网设备、投屏、NAS、打印机、光猫后台
+# ================================
+bypass_tunnel_proxy:
+  - "localhost"
+  - "*.local"
+  - "*.lan"
+  - "*.home.arpa"
+
+  # IPv4 Local / LAN / Link-local / Multicast
+  - "127.0.0.0/8"
+  - "10.0.0.0/8"
+  - "172.16.0.0/12"
+  - "192.168.0.0/16"
+  - "169.254.0.0/16"
+  - "224.0.0.0/4"
+  - "255.255.255.255/32"
+
+  # 常见路由器 / 光猫后台
+  - "router.asus.com"
+  - "*.asusrouter.com"
+  - "*.routerlogin.net"
+  - "*.routerlogin.com"
+  - "*.tplinkwifi.net"
+  - "*.tplinklogin.net"
+  - "*.miwifi.com"
+  - "*.tendawifi.com"
+  - "*.tendacn.com"
+  - "*.phicomm.me"
+
+# ================================
+# Real IP Domains
+# 不使用 Fake-IP，避免局域网、游戏、STUN、时间同步异常
+# ================================
+real_ip_domains:
+  # Local
+  - "*.local"
+  - "*.lan"
+  - "*.home.arpa"
+  - "router.asus.com"
+  - "*.asusrouter.com"
+  - "*.tplinkwifi.net"
+  - "*.miwifi.com"
+
+  # Apple Push / Time
+  # 不代理 APNs，只是避免 Fake-IP，减少推送玄学问题
+  - "*.push.apple.com"
+  - "time.apple.com"
+  - "time-ios.apple.com"
+
+  # Microsoft / Xbox / Game NAT
+  - "*.xboxlive.com"
+  - "xbox.*.microsoft.com"
+  - "*.srv.nintendo.net"
+  - "*.stun.playstation.net"
+
+  # STUN / WebRTC / NAT
+  - "stun.l.google.com"
+  - "stun*.l.google.com"
+  - "*.stun.*"
+
+  # NTP
+  - "pool.ntp.org"
+  - "*.pool.ntp.org"
+  - "*.ntp.org"
+  - "time.windows.com"
+  - "time.cloudflare.com"
+  - "time1.cloud.tencent.com"
+
+# ================================
+# DNS
+# 轻量处理，不抢你的主 DNS 逻辑
+# ================================
+dns:
+  bootstrap:
+    - system
+
+  forward:
+    # 局域网域名交给系统 DNS，避免 Fake-IP 或远端 DNS 污染局域网解析
+    - domain_suffix:
+        match: "lan"
+        value: bootstrap
+    - domain_suffix:
+        match: "local"
+        value: bootstrap
+    - domain_suffix:
+        match: "home.arpa"
+        value: bootstrap
+
+# ================================
+# Rules
+# 注意：这些规则建议放在主规则前面
+# ================================
+rules:
+  # ================================
+  # Local / LAN Direct
+  # ================================
+  - domain_suffix:
+      match: "local"
+      policy: DIRECT
+
+  - domain_suffix:
+      match: "lan"
+      policy: DIRECT
+
+  - domain_suffix:
+      match: "home.arpa"
+      policy: DIRECT
+
+  - domain:
+      match: "localhost"
+      policy: DIRECT
+
+  - domain:
+      match: "router.asus.com"
+      policy: DIRECT
+
+  - domain_suffix:
+      match: "asusrouter.com"
+      policy: DIRECT
+
+  - domain_suffix:
+      match: "tplinkwifi.net"
+      policy: DIRECT
+
+  - domain_suffix:
+      match: "tplinklogin.net"
+      policy: DIRECT
+
+  - domain_suffix:
+      match: "miwifi.com"
+      policy: DIRECT
+
+  - domain_suffix:
+      match: "tendawifi.com"
+      policy: DIRECT
+
+  - domain_suffix:
+      match: "routerlogin.net"
+      policy: DIRECT
+
+  - ip_cidr:
+      match: "127.0.0.0/8"
+      policy: DIRECT
+      no_resolve: true
+
+  - ip_cidr:
+      match: "10.0.0.0/8"
+      policy: DIRECT
+      no_resolve: true
+
+  - ip_cidr:
+      match: "172.16.0.0/12"
+      policy: DIRECT
+      no_resolve: true
+
+  - ip_cidr:
+      match: "192.168.0.0/16"
+      policy: DIRECT
+      no_resolve: true
+
+  - ip_cidr:
+      match: "169.254.0.0/16"
+      policy: DIRECT
+      no_resolve: true
+
+  - ip_cidr:
+      match: "224.0.0.0/4"
+      policy: DIRECT
+      no_resolve: true
