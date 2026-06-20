@@ -2,13 +2,6 @@ name: Update Calendar
 
 on:
   workflow_dispatch:
-  push:
-    branches:
-      - main
-    paths:
-      - "Calendar/data/**"
-      - "Calendar/scripts/**"
-      - ".github/workflows/update-calendar.yml"
 
 permissions:
   contents: write
