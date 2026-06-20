@@ -128,8 +128,9 @@ jobs:
 
           def file_card(file):
               install = f'<a class="btn small" href="{escape(file["install"])}">安装</a>' if file["install"] else ""
+              search = escape((file["name"] + " " + file["path"] + " " + file["title"]).lower())
               return f"""
-                <article class="file-card" data-folder="{escape(file["folder"])}" data-search="{escape((file["name"] + " " + file["path"] + " " + file["title"]).lower())}">
+                <article class="file-card" data-folder="{escape(file["folder"])}" data-search="{search}">
                   <div class="file-top">
                     <span class="file-icon">{escape(file["icon"])}</span>
                     <span class="file-type">{escape(file["title"])}</span>
@@ -368,7 +369,7 @@ jobs:
                   if (show) count++;
                 }});
 
-                meta.textContent = `共 ${{count}} 项`;
+                meta.textContent = '共 ' + count + ' 项';
                 empty.style.display = count ? 'none' : 'block';
               }}
 
