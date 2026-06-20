@@ -2,7 +2,7 @@
   "version": 1,
   "startYear": 2026,
   "targetYear": 2026,
-  "updatedAt": "2026-06-20T23:51:59+08:00",
+  "updatedAt": "2026-06-21T00:24:32+08:00",
   "latest": {
     "title": "永久更新订阅",
     "name": "中国大陆节假日与中国纪念日 最新订阅 2026-2026",
@@ -12,8 +12,8 @@
     "years": [
       2026
     ],
-    "count": 96,
-    "size": 31516
+    "count": 93,
+    "size": 29702
   },
   "years": [
     {
@@ -23,8 +23,8 @@
       "path": "Calendar/cn-mainland-2026.ics",
       "raw": "https://raw.githubusercontent.com/Luke-Lab666/ProxyKit/main/Calendar/cn-mainland-2026.ics",
       "webcal": "webcal://raw.githubusercontent.com/Luke-Lab666/ProxyKit/main/Calendar/cn-mainland-2026.ics",
-      "count": 96,
-      "size": 31498
+      "count": 93,
+      "size": 29684
     }
   ]
 }
