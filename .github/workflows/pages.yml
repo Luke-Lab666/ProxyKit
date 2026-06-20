@@ -847,8 +847,6 @@ jobs:
                   <span class="logo">PK</span>
                   <b>ProxyKit</b>
                 </a>
-
-                <a class="repo-link" href="https://github.com/$OWNER/$REPO">查看仓库</a>
               </nav>
 
               <section class="hero">
