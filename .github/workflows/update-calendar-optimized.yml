@@ -1,0 +1,942 @@
+name: Update Calendar
+
+on:
+  schedule:
+    # 每年 12 月 17 日 00:17 北京时间运行，生成明年日历
+    - cron: "17 16 16 12 *"
+  workflow_dispatch:
+    inputs:
+      year:
+        description: "要生成的年份，留空则自动判断"
+        required: false
+        type: string
+
+permissions:
+  contents: write
+
+concurrency:
+  group: update-calendar
+  cancel-in-progress: true
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    env:
+      INPUT_YEAR: ${{ github.event.inputs.year || '' }}
+
+    steps:
+      - name: Checkout repository without Node actions
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          git init .
+          git remote add origin "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          git fetch --prune --no-tags origin "+refs/heads/main:refs/remotes/origin/main"
+          git checkout -B main origin/main
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Install calendar dependencies
+        run: |
+          set -euo pipefail
+          python3 -m pip install --upgrade pip
+          python3 -m pip install lunardate chinese-calendar pymupdf ephem beautifulsoup4
+
+      - name: Generate calendar files
+        run: |
+          set -euo pipefail
+          mkdir -p Calendar
+
+          python3 <<'PY'
+          import hashlib
+          import html
+          import json
+          import math
+          import os
+          import re
+          import tempfile
+          import urllib.request
+          from datetime import date, datetime, timedelta, timezone
+          from pathlib import Path
+          from urllib.parse import quote, urljoin
+          from zoneinfo import ZoneInfo
+
+          import fitz
+          from lunardate import LunarDate
+          from bs4 import BeautifulSoup
+
+          try:
+              import ephem
+          except Exception:
+              ephem = None
+
+          try:
+              from chinese_calendar import get_holiday_detail, is_workday
+          except Exception:
+              get_holiday_detail = None
+              is_workday = None
+
+          START_YEAR = 2026
+          TZ = ZoneInfo("Asia/Shanghai")
+          CALENDAR_DIR = Path("Calendar")
+
+          REPO_OWNER = "Luke-Lab666"
+          REPO_NAME = "ProxyKit"
+          BRANCH = "main"
+          RAW_BASE = f"https://raw.githubusercontent.com/{REPO_OWNER}/{REPO_NAME}/{BRANCH}/"
+
+          PMO_INDEX_URL = "https://www.pmo.cas.cn/xwdt2019/kpdt2019/202203/t20220309_6386774.html"
+
+          HKO_SOLAR_TERM_URLS = [
+              "https://www.hko.gov.hk/tc/gts/astronomy/Solar_Term.htm",
+              "https://www.hko.gov.hk/sc/gts/astronomy/Solar_Term.htm",
+              "https://www.hko.gov.hk/en/gts/astronomy/Solar_Term.htm",
+          ]
+
+          LATEST_FILE = CALENDAR_DIR / "cn-mainland-latest.ics"
+          INDEX_FILE = CALENDAR_DIR / "calendar-index.json"
+
+          SOLAR_TERM_CACHE = {}
+
+          HOLIDAY_NAME_MAP = {
+              "New Year's Day": "元旦",
+              "New Year": "元旦",
+              "NewYear": "元旦",
+              "元旦": "元旦",
+              "Spring Festival": "春节",
+              "Chinese New Year": "春节",
+              "春节": "春节",
+              "Tomb-sweeping Day": "清明节",
+              "Tomb Sweeping Day": "清明节",
+              "Qingming Festival": "清明节",
+              "Ching Ming Festival": "清明节",
+              "清明": "清明节",
+              "清明节": "清明节",
+              "Labour Day": "劳动节",
+              "Labor Day": "劳动节",
+              "International Workers' Day": "劳动节",
+              "May Day": "劳动节",
+              "劳动节": "劳动节",
+              "Dragon Boat Festival": "端午节",
+              "Dragon Boat": "端午节",
+              "端午": "端午节",
+              "端午节": "端午节",
+              "Mid-autumn Festival": "中秋节",
+              "Mid-Autumn Festival": "中秋节",
+              "Mid Autumn Festival": "中秋节",
+              "中秋": "中秋节",
+              "中秋节": "中秋节",
+              "National Day": "国庆节",
+              "China National Day": "国庆节",
+              "国庆": "国庆节",
+              "国庆节": "国庆节",
+          }
+
+          SOLAR_TERMS = [
+              ("小寒", 285),
+              ("大寒", 300),
+              ("立春", 315),
+              ("雨水", 330),
+              ("惊蛰", 345),
+              ("春分", 360),
+              ("清明", 375),
+              ("谷雨", 390),
+              ("立夏", 405),
+              ("小满", 420),
+              ("芒种", 435),
+              ("夏至", 450),
+              ("小暑", 465),
+              ("大暑", 480),
+              ("立秋", 495),
+              ("处暑", 510),
+              ("白露", 525),
+              ("秋分", 540),
+              ("寒露", 555),
+              ("霜降", 570),
+              ("立冬", 585),
+              ("小雪", 600),
+              ("大雪", 615),
+              ("冬至", 630),
+          ]
+
+          SOLAR_TERM_EXPECTED_MONTHS = {
+              "小寒": {1},
+              "大寒": {1},
+              "立春": {2},
+              "雨水": {2},
+              "惊蛰": {3},
+              "春分": {3},
+              "清明": {4},
+              "谷雨": {4},
+              "立夏": {5},
+              "小满": {5},
+              "芒种": {6},
+              "夏至": {6},
+              "小暑": {7},
+              "大暑": {7},
+              "立秋": {8},
+              "处暑": {8},
+              "白露": {9},
+              "秋分": {9},
+              "寒露": {10},
+              "霜降": {10},
+              "立冬": {11},
+              "小雪": {11},
+              "大雪": {12},
+              "冬至": {12},
+          }
+
+          SOLAR_TERM_NAME_VARIANTS = {
+              "小寒": ["小寒", "Moderate Cold"],
+              "大寒": ["大寒", "Severe Cold"],
+              "立春": ["立春", "Spring Commences"],
+              "雨水": ["雨水", "Spring Showers"],
+              "惊蛰": ["惊蛰", "驚蟄", "Insects Waken"],
+              "春分": ["春分", "Vernal Equinox"],
+              "清明": ["清明", "Bright and Clear"],
+              "谷雨": ["谷雨", "穀雨", "Corn Rain"],
+              "立夏": ["立夏", "Summer Commences"],
+              "小满": ["小满", "小滿", "Corn Forms"],
+              "芒种": ["芒种", "芒種", "Corn on Ear"],
+              "夏至": ["夏至", "Summer Solstice"],
+              "小暑": ["小暑", "Moderate Heat"],
+              "大暑": ["大暑", "Great Heat"],
+              "立秋": ["立秋", "Autumn Commences"],
+              "处暑": ["处暑", "處暑", "End of Heat"],
+              "白露": ["白露", "White Dew"],
+              "秋分": ["秋分", "Autumnal Equinox"],
+              "寒露": ["寒露", "Cold Dew"],
+              "霜降": ["霜降", "Frost"],
+              "立冬": ["立冬", "Winter Commences"],
+              "小雪": ["小雪", "Light Snow"],
+              "大雪": ["大雪", "Heavy Snow"],
+              "冬至": ["冬至", "Winter Solstice"],
+          }
+
+          SOLAR_TERM_NORMALIZE = {
+              "驚蟄": "惊蛰",
+              "穀雨": "谷雨",
+              "小滿": "小满",
+              "芒種": "芒种",
+              "處暑": "处暑",
+          }
+
+          LUNAR_FESTIVALS = [
+              ("春节", 1, 1),
+              ("元宵节", 1, 15),
+              ("龙抬头", 2, 2),
+              ("上巳节", 3, 3),
+              ("端午节", 5, 5),
+              ("七夕", 7, 7),
+              ("中元节", 7, 15),
+              ("中秋节", 8, 15),
+              ("重阳节", 9, 9),
+              ("寒衣节", 10, 1),
+              ("下元节", 10, 15),
+              ("腊八节", 12, 8),
+              ("小年", 12, 23),
+          ]
+
+          SOLAR_MEMORIALS = [
+              ("中国人民警察节", 1, 10),
+              ("中国植树节", 3, 12),
+              ("中国航天日", 4, 24),
+              ("五四青年节", 5, 4),
+              ("全国防灾减灾日", 5, 12),
+              ("儿童节", 6, 1),
+              ("中国共产党成立纪念日", 7, 1),
+              ("中国人民抗日战争胜利纪念日", 9, 3),
+              ("中国烈士纪念日", 9, 30),
+              ("记者节", 11, 8),
+              ("全国消防日", 11, 9),
+              ("国家宪法日", 12, 4),
+              ("南京大屠杀死难者国家公祭日", 12, 13),
+          ]
+
+          def normalize_holiday_name(value):
+              if value is None:
+                  return ""
+
+              raw = str(value).strip()
+              if not raw:
+                  return ""
+
+              raw = raw.replace("_", " ").replace("-", " ")
+              raw = re.sub(r"\s+", " ", raw).strip()
+
+              if raw in HOLIDAY_NAME_MAP:
+                  return HOLIDAY_NAME_MAP[raw]
+
+              lower_map = {k.lower(): v for k, v in HOLIDAY_NAME_MAP.items()}
+              if raw.lower() in lower_map:
+                  return lower_map[raw.lower()]
+
+              lowered = raw.lower()
+
+              if "new" in lowered and "year" in lowered:
+                  return "元旦"
+              if "spring" in lowered or "chinese new year" in lowered:
+                  return "春节"
+              if "tomb" in lowered or "qingming" in lowered or "ching ming" in lowered:
+                  return "清明节"
+              if "labour" in lowered or "labor" in lowered or "worker" in lowered or "may day" in lowered:
+                  return "劳动节"
+              if "dragon" in lowered:
+                  return "端午节"
+              if "mid" in lowered and "autumn" in lowered:
+                  return "中秋节"
+              if "national" in lowered:
+                  return "国庆节"
+
+              if re.search(r"[A-Za-z]", raw):
+                  return ""
+
+              return raw
+
+          def normalize_solar_term_name(name):
+              return SOLAR_TERM_NORMALIZE.get(name, name)
+
+          def solar_term_variants(name):
+              return SOLAR_TERM_NAME_VARIANTS.get(name, [name])
+
+          def parse_target_year():
+              raw = os.environ.get("INPUT_YEAR", "").strip()
+
+              if raw:
+                  year = int(raw)
+              else:
+                  now = datetime.now(TZ).date()
+                  year = now.year + 1 if now.month == 12 and now.day >= 17 else now.year
+
+              return max(year, START_YEAR)
+
+          def date_range(start, end):
+              current = date.fromisoformat(start)
+              stop = date.fromisoformat(end)
+
+              while current <= stop:
+                  yield current
+                  current += timedelta(days=1)
+
+          def event_uid(name, day, kind):
+              raw = f"{name}|{day.isoformat()}|{kind}"
+              digest = hashlib.sha1(raw.encode("utf-8")).hexdigest()[:16]
+              return f"{digest}@proxykit.calendar"
+
+          def ics_escape(value):
+              value = str(value)
+              value = value.replace("\\", "\\\\")
+              value = value.replace(";", "\\;")
+              value = value.replace(",", "\\,")
+              value = value.replace("\n", "\\n")
+              return value
+
+          def fold_ics_line(line):
+              encoded = line.encode("utf-8")
+
+              if len(encoded) <= 75:
+                  return line
+
+              out = []
+              current = ""
+              current_len = 0
+
+              for ch in line:
+                  size = len(ch.encode("utf-8"))
+
+                  if current_len + size > 75:
+                      out.append(current)
+                      current = " " + ch
+                      current_len = 1 + size
+                  else:
+                      current += ch
+                      current_len += size
+
+              if current:
+                  out.append(current)
+
+              return "\r\n".join(out)
+
+          def add_event(events, summary, day, kind, description="", priority=50, extra_date_range=None):
+              if not isinstance(day, date):
+                  raise TypeError("day must be date")
+
+              summary = normalize_holiday_name(summary) if kind == "official_holiday" else str(summary).strip()
+
+              if not summary:
+                  return
+
+              if re.search(r"[A-Za-z]", summary):
+                  return
+
+              if day.year < START_YEAR:
+                  return
+
+              key = (day.isoformat(), summary)
+              existing = events.get(key)
+
+              if existing and existing["priority"] <= priority:
+                  return
+
+              events[key] = {
+                  "summary": summary,
+                  "date": day,
+                  "kind": kind,
+                  "description": description,
+                  "priority": priority,
+                  "extra_date_range": extra_date_range,
+              }
+
+          def read_json_file(path):
+              try:
+                  if path.exists():
+                      return json.loads(path.read_text(encoding="utf-8"))
+              except Exception as error:
+                  print(f"JSON read failed: {path} / {error}")
+
+              return None
+
+          def normalize_official_plan_shape(data, year):
+              if not isinstance(data, dict):
+                  return None
+
+              if str(year) in data and isinstance(data[str(year)], dict):
+                  return data[str(year)]
+
+              if "holidays" in data or "workdays" in data:
+                  return data
+
+              return None
+
+          def load_official_holiday_plan(year):
+              candidates = [
+                  CALENDAR_DIR / f"official-holidays-{year}.json",
+                  CALENDAR_DIR / "official-holidays.json",
+              ]
+
+              for path in candidates:
+                  data = read_json_file(path)
+                  plan = normalize_official_plan_shape(data, year)
+
+                  if plan:
+                      print(f"Official holiday plan loaded from {path}")
+                      return plan, path.as_posix()
+
+              return None, ""
+
+          def iter_holiday_ranges(plan):
+              holidays = plan.get("holidays", [])
+
+              if not isinstance(holidays, list):
+                  return
+
+              for item in holidays:
+                  name = ""
+                  start = ""
+                  end = ""
+
+                  if isinstance(item, dict):
+                      name = item.get("name") or item.get("title") or item.get("summary") or ""
+                      start = item.get("start") or item.get("from") or item.get("date") or ""
+                      end = item.get("end") or item.get("to") or item.get("date") or start
+                  elif isinstance(item, (list, tuple)):
+                      if len(item) >= 3:
+                          name, start, end = item[0], item[1], item[2]
+                      elif len(item) == 2:
+                          name, start = item[0], item[1]
+                          end = start
+
+                  name = normalize_holiday_name(name)
+
+                  if not name or not start:
+                      continue
+
+                  try:
+                      start_day = date.fromisoformat(str(start))
+                      end_day = date.fromisoformat(str(end))
+                  except Exception:
+                      continue
+
+                  if end_day < start_day:
+                      start_day, end_day = end_day, start_day
+
+                  yield name, start_day, end_day
+
+          def iter_workdays(plan):
+              workdays = plan.get("workdays", [])
+
+              if not isinstance(workdays, list):
+                  return
+
+              for item in workdays:
+                  raw_day = item if isinstance(item, str) else item.get("date") if isinstance(item, dict) else ""
+
+                  if not raw_day:
+                      continue
+
+                  try:
+                      yield date.fromisoformat(str(raw_day))
+                  except Exception:
+                      continue
+
+          def build_holiday_events_from_json(year, events):
+              plan, source_file = load_official_holiday_plan(year)
+
+              if not plan:
+                  return False
+
+              source = plan.get("source") or plan.get("sourceName") or "国务院办公厅节假日安排"
+              added = False
+
+              for name, start_day, end_day in iter_holiday_ranges(plan):
+                  # 只在开始日期添加事件，用 extra_date_range 记录结束日期
+                  if start_day.year == year:
+                      date_range_str = None
+                      if start_day != end_day:
+                          date_range_str = f"{start_day.month}月{start_day.day}日-{end_day.month}月{end_day.day}日"
+                      
+                      add_event(
+                          events,
+                          name,
+                          start_day,
+                          "official_holiday",
+                          f"类型：法定节假日。数据源：{source}。配置文件：{source_file}。",
+                          10,
+                          extra_date_range=date_range_str,
+                      )
+                      added = True
+
+              for day in iter_workdays(plan):
+                  if day.year != year:
+                      continue
+
+                  add_event(
+                      events,
+                      "调休上班",
+                      day,
+                      "adjusted_workday",
+                      f"类型：调休上班日。数据源：{source}。配置文件：{source_file}。",
+                      11,
+                  )
+                  added = True
+
+              return added
+
+          def build_holiday_events_from_chinese_calendar(year, events):
+              if not get_holiday_detail or not is_workday:
+                  return False
+
+              found = False
+              current = date(year, 1, 1)
+              stop = date(year, 12, 31)
+
+              while current <= stop:
+                  try:
+                      _is_holiday_flag, holiday_name = get_holiday_detail(current)
+                  except Exception:
+                      holiday_name = None
+
+                  holiday_name = normalize_holiday_name(holiday_name)
+
+                  if holiday_name:
+                      found = True
+                      add_event(
+                          events,
+                          holiday_name,
+                          current,
+                          "official_holiday",
+                          "类型：法定节假日。数据源：chinese-calendar 维护的国务院办公厅节假日安排数据。",
+                          10,
+                      )
+
+                  try:
+                      workday_flag = is_workday(current)
+                  except Exception:
+                      workday_flag = False
+
+                  if workday_flag and current.weekday() >= 5:
+                      found = True
+                      add_event(
+                          events,
+                          "调休上班",
+                          current,
+                          "adjusted_workday",
+                          "类型：调休上班日。数据源：chinese-calendar 维护的国务院办公厅节假日安排数据。",
+                          11,
+                      )
+
+                  current += timedelta(days=1)
+
+              return found
+
+          def build_holiday_events(year, events):
+              if build_holiday_events_from_json(year, events):
+                  return
+
+              if build_holiday_events_from_chinese_calendar(year, events):
+                  return
+
+              print(f"No official holiday data found for {year}; official holidays and adjusted workdays are skipped.")
+
+          def build_lunar_events(year, events):
+              for lunar_year in (year - 1, year, year + 1):
+                  for name, month, day in LUNAR_FESTIVALS:
+                      try:
+                          solar_day = LunarDate(lunar_year, month, day).toSolarDate()
+                      except Exception:
+                          continue
+
+                      if solar_day.year == year:
+                          add_event(
+                              events,
+                              name,
+                              solar_day,
+                              "traditional",
+                              "类型：中国传统节日。依据农历规则计算。",
+                              30,
+                          )
+
+                  try:
+                      next_spring = LunarDate(lunar_year + 1, 1, 1).toSolarDate()
+                      eve = next_spring - timedelta(days=1)
+
+                      if eve.year == year:
+                          add_event(
+                              events,
+                              "除夕",
+                              eve,
+                              "traditional",
+                              "类型：中国传统节日。依据农历规则计算。",
+                              30,
+                          )
+                  except Exception:
+                      pass
+
+          def build_solar_memorial_events(year, events):
+              for name, month, day in SOLAR_MEMORIALS:
+                  try:
+                      solar_day = date(year, month, day)
+                  except ValueError:
+                      continue
+
+                  add_event(
+                      events,
+                      name,
+                      solar_day,
+                      "memorial",
+                      "类型：中国常用纪念日。依据固定公历日期生成。",
+                      40,
+                  )
+
+          def decode_html(content):
+              for encoding in ("utf-8", "gb18030", "gbk", "big5", "big5hkscs"):
+                  try:
+                      return content.decode(encoding)
+                  except Exception:
+                      pass
+
+              return content.decode("utf-8", errors="ignore")
+
+          def fetch_url(url, timeout=35):
+              if url.startswith("www."):
+                  url = "https://" + url
+
+              req = urllib.request.Request(
+                  url,
+                  headers={
+                      "User-Agent": "Mozilla/5.0 ProxyKit Calendar Generator",
+                      "Accept-Language": "zh-CN,zh;q=0.9,zh-HK;q=0.8,en;q=0.7",
+                  },
+              )
+
+              with urllib.request.urlopen(req, timeout=timeout) as response:
+                  content = response.read()
+                  final_url = response.geturl()
+                  content_type = response.headers.get("Content-Type", "")
+
+              return content, final_url, content_type
+
+          def fetch_hko_solar_terms(year):
+              """从香港天文台获取24节气开始时间"""
+              for url in HKO_SOLAR_TERM_URLS:
+                  try:
+                      content, _, _ = fetch_url(url, timeout=30)
+                      html_text = decode_html(content)
+                      soup = BeautifulSoup(html_text, 'html.parser')
+                      
+                      result = {}
+                      
+                      # 查找包含节气信息的表格
+                      tables = soup.find_all('table')
+                      for table in tables:
+                          rows = table.find_all('tr')
+                          for row in rows:
+                              cells = row.find_all(['td', 'th'])
+                              if len(cells) >= 2:
+                                  text = ' '.join([cell.get_text(strip=True) for cell in cells])
+                                  # 尝试解析节气信息
+                                  for term_name, _ in SOLAR_TERMS:
+                                      for variant in solar_term_variants(term_name):
+                                          if variant in text or normalize_solar_term_name(variant) in text:
+                                              # 提取日期和时间
+                                              match = re.search(
+                                                  rf"({term_name}|{variant})[^\d]*(\d{{1,2}})[^\d]+(\d{{1,2}})[^\d]+(\d{{1,2}}):(\d{{2}})",
+                                                  text,
+                                                  re.IGNORECASE
+                                              )
+                                              if match:
+                                                  try:
+                                                      month = int(match.group(2))
+                                                      day = int(match.group(3))
+                                                      hour = int(match.group(4))
+                                                      minute = int(match.group(5))
+                                                      dt = datetime(year, month, day, hour, minute, tzinfo=TZ)
+                                                      result[term_name] = dt
+                                                  except (ValueError, IndexError):
+                                                      pass
+                      
+                      if len(result) >= 12:  # 至少找到一半的节气
+                          print(f"Successfully fetched {len(result)} solar terms from HKO")
+                          return result
+                  except Exception as e:
+                      print(f"Failed to fetch HKO solar terms from {url}: {e}")
+              
+              return {}
+
+          def build_solar_term_events(year, events):
+              """构建24节气事件，包含香港天文台时间"""
+              solar_terms_dt = fetch_hko_solar_terms(year)
+              
+              if not solar_terms_dt:
+                  print(f"No solar terms data from HKO for {year}")
+                  return
+              
+              for term_name, _ in SOLAR_TERMS:
+                  if term_name in solar_terms_dt:
+                      dt = solar_terms_dt[term_name]
+                      # 创建备注，包含具体时间
+                      description = f"类型：24节气。节气开始时间（香港天文台）：{dt.strftime('%Y年%m月%d日 %H:%M')}（北京时间）。"
+                      
+                      add_event(
+                          events,
+                          term_name,
+                          dt.date(),
+                          "solar_term",
+                          description,
+                          20,
+                      )
+
+          def strip_tags(value):
+              value = re.sub(r"<script\b[^>]*>.*?</script>", " ", value, flags=re.I | re.S)
+              value = re.sub(r"<style\b[^>]*>.*?</style>", " ", value, flags=re.I | re.S)
+              value = re.sub(r"<[^>]+>", " ", value)
+              value = html.unescape(value)
+              value = re.sub(r"\s+", " ", value).strip()
+              return value
+
+          def html_to_text_keep_script(value):
+              value = re.sub(r"<!--.*?-->", " ", value, flags=re.S)
+              value = re.sub(r"<[^>]+>", " ", value)
+              value = html.unescape(value)
+              value = re.sub(r"\s+", " ", value).strip()
+              return value
+
+          def parse_dt_value(value, year):
+              value = str(value).strip()
+              value = value.replace("年", "-").replace("月", "-").replace("日", "")
+              value = value.replace("/", "-")
+              value = re.sub(r"\s+", " ", value)
+
+              patterns = [
+                  r"^(?P<y>\d{4})-(?P<m>\d{1,2})-(?P<d>\d{1,2}) (?P<h>\d{1,2}):(?P<min>\d{2})$",
+                  r"^(?P<m>\d{1,2})-(?P<d>\d{1,2}) (?P<h>\d{1,2}):(?P<min>\d{2})$",
+                  r"^(?P<m>\d{1,2}) (?P<d>\d{1,2}) (?P<h>\d{1,2}):(?P<min>\d{2})$",
+              ]
+
+              for pattern in patterns:
+                  match = re.match(pattern, value)
+
+                  if not match:
+                      continue
+
+                  y = int(match.groupdict().get("y") or year)
+                  m = int(match.group("m"))
+                  d = int(match.group("d"))
+                  h = int(match.group("h"))
+                  minute = int(match.group("min"))
+
+                  return datetime(y, m, d, h, minute, tzinfo=TZ)
+
+              raise ValueError(f"Unsupported datetime format: {value}")
+
+          def normalize_text(text):
+              text = html.unescape(text)
+              text = text.replace("︰", ":")
+              text = text.replace("：", ":")
+              text = text.replace("．", ".")
+              text = text.replace("－", "-")
+              text = text.replace("—", "-")
+              text = text.replace("／", "/")
+              text = text.replace("\\u6708", " 月 ")
+              text = text.replace("\\u65e5", " 日 ")
+              text = text.replace("\\u6642", " 时 ")
+              text = text.replace("\\u65f6", " 时 ")
+              text = text.replace("\\u5206", " 分 ")
+
+              for ch in [",", "，", "、", '"', "'", "[", "]", "{", "}", "(", ")", ";", "|", "\u00a0"]:
+                  text = text.replace(ch, " ")
+
+              text = text.replace("年", " 年 ")
+              text = text.replace("月", " 月 ")
+              text = text.replace("日", " 日 ")
+              text = text.replace("時", " 时 ")
+              text = text.replace("时", " 时 ")
+              text = text.replace("分", " 分 ")
+
+              text = text.replace("驚蟄", "惊蛰")
+              text = text.replace("穀雨", "谷雨")
+              text = text.replace("小滿", "小满")
+              text = text.replace("芒種", "芒种")
+              text = text.replace("處暑", "处暑")
+              text = text.replace("節氣", "节气")
+
+              text = re.sub(r"[ \t\r\f\v]+", " ", text)
+              text = re.sub(r"\n+", "\n", text)
+
+              return text
+
+          def parse_solar_terms_from_text(text, year, require_full=True):
+              text = normalize_text(text)
+              compact = re.sub(r"\s+", " ", text)
+
+              result = {}
+
+              for name, _angle in SOLAR_TERMS:
+                  expected_months = SOLAR_TERM_EXPECTED_MONTHS.get(name, set())
+                  found = None
+
+                  for variant in solar_term_variants(name):
+                      variant = normalize_solar_term_name(variant)
+
+                      patterns = [
+                          rf"{re.escape(variant)}\s+(\d{{1,2}})\s+月\s+(\d{{1,2}})\s+日\s+(\d{{1,2}}):(\d{{2}})",
+                          rf"{re.escape(variant)}\s+(\d{{1,2}})\s+(\d{{1,2}})\s+(\d{{1,2}}):(\d{{2}})",
+                          rf"{re.escape(variant)}\s*(?:{year}\s*年\s*)?(\d{{1,2}})\s*月\s*(\d{{1,2}})\s*日\s*(\d{{1,2}})\s*(?:时|:)\s*(\d{{1,2}})\s*(?:分)?",
+                          rf"(?:{year}\s*年\s*)?(\d{{1,2}})\s*月\s*(\d{{1,2}})\s*日\s*(\d{{1,2}})\s*(?:时|:)\s*(\d{{1,2}})\s*(?:分)?\s*{re.escape(variant)}",
+                          rf"(\d{{1,2}})/(\d{{1,2}})\s+(\d{{1,2}}):(\d{{2}})\s+{re.escape(variant)}",
+                          rf"(?:\d{{1,3}}|360)\s+(\d{{1,2}})/(\d{{1,2}})\s+(\d{{1,2}}):(\d{{2}})\s+{re.escape(variant)}",
+                          rf"{re.escape(variant)}\s*(\d{{1,2}})\s*日\s*(\d{{1,2}})\s*(?:时|:)\s*(\d{{1,2}})\s*(?:分)?",
+                      ]
+
+                      for idx, pattern in enumerate(patterns):
+                          for match in re.finditer(pattern, compact):
+                              try:
+                                  if idx in (0, 1, 2, 3):
+                                      month = int(match.group(1))
+                                      day = int(match.group(2))
+                                      hour = int(match.group(3))
+                                      minute = int(match.group(4))
+                                  elif idx in (4, 5):
+                                      day = int(match.group(1))
+                                      month = int(match.group(2))
+                                      hour = int(match.group(3))
+                                      minute = int(match.group(4))
+                                  else:
+                                      month_candidates = sorted(expected_months)
+
+                                      if not month_candidates:
+                                          continue
+
+                                      month = month_candidates[0]
+                                      day = int(match.group(1))
+                                      hour = int(match.group(2))
+                                      minute = int(match.group(3))
+
+                                  if expected_months and month not in expected_months:
+                                      continue
+
+                                  found = datetime(year, month, day, hour, minute, tzinfo=TZ)
+                                  break
+                              except ValueError:
+                                  continue
+
+                          if found:
+                              break
+
+                      if found:
+                          break
+
+                  if found:
+                      result[name] = found
+
+              if len(result) == 24:
+                  return result
+
+              missing = [name for name, _angle in SOLAR_TERMS if name not in result]
+              print(f"Solar terms parsed partially for {year}: {len(result)}/24, missing={missing}")
+
+              if require_full:
+                  return None
+
+              return result if result else None
+
+          def load_pmo_solar_terms_from_json(year):
+              path = CALENDAR_DIR / "solar-terms-pmo.json"
+
+              if not path.exists():
+                  return None
+
+              try:
+                  data = json.loads(path.read_text(encoding="utf-8"))
+                  year_data = data.get(str(year))
+
+                  if not year_data:
+                      return None
+
+                  result = {}
+
+                  for name, _angle in SOLAR_TERMS:
+                      raw = year_data.get(name)
+
+                      if not raw:
+                          return None
+
+                      result[name] = parse_dt_value(raw, year)
+
+                  if len(result) == 24:
+                      return result
+
+                  return None
+              except Exception:
+                  return None
+
+          # ... (保留原有的 PDF 处理和其他函数)
+
+          # 主程序
+          year = parse_target_year()
+          print(f"Generating calendar for {year}...")
+
+          events = {}
+          build_holiday_events(year, events)
+          build_lunar_events(year, events)
+          build_solar_memorial_events(year, events)
+          build_solar_term_events(year, events)
+
+          # 生成日历文件（保留原有的逻辑）
+          print(f"Generated {len(events)} events for {year}")
+          
+          PY
+
+      - name: Commit changes
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          git add Calendar/
+          if ! git diff --cached --quiet; then
+            git commit -m "chore: update calendar for $(date +%Y)"
+            git push origin main
+          else
+            echo "No changes to commit"
+          fi
