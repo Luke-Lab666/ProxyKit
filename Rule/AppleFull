@@ -1,18 +1,18 @@
 # NAME: AppleFull
 # AUTHOR: Luke-Lab666
 # REPO: https://github.com/Luke-Lab666/ProxyKit
-# UPDATED: 2026-06-19 22:14:07 UTC
+# UPDATED: 2026-06-20 12:49:33 UTC
 # DESC: Full Apple related domain and IP rules for Surge.
 # FORMAT: Surge Rule Set
 # SOURCE:
-#   - https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Surge/Apple/Apple.list
-#   - https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Surge/AppStore/AppStore.list
-#   - https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Surge/iCloud/iCloud.list
-#   - https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Surge/AppleMusic/AppleMusic.list
-#   - https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Surge/AppleTV/AppleTV.list
-#   - https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Surge/TestFlight/TestFlight.list
-#   - https://raw.githubusercontent.com/Loyalsoldier/surge-rules/release/ruleset/apple.txt
-#   - https://raw.githubusercontent.com/Loyalsoldier/surge-rules/release/ruleset/icloud.txt
+# - https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Surge/Apple/Apple.list
+# - https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Surge/AppStore/AppStore.list
+# - https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Surge/iCloud/iCloud.list
+# - https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Surge/AppleMusic/AppleMusic.list
+# - https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Surge/AppleTV/AppleTV.list
+# - https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Surge/TestFlight/TestFlight.list
+# - https://raw.githubusercontent.com/Loyalsoldier/surge-rules/release/ruleset/apple.txt
+# - https://raw.githubusercontent.com/Loyalsoldier/surge-rules/release/ruleset/icloud.txt
 
 DOMAIN-SUFFIX,a1.mzstatic.com
 DOMAIN-SUFFIX,a2.mzstatic.com
@@ -184,6 +184,7 @@ DOMAIN-SUFFIX,itunesconnect.apple.com
 DOMAIN-SUFFIX,iwork.apple.com
 DOMAIN-SUFFIX,mac.com
 DOMAIN-SUFFIX,me.com
+DOMAIN-SUFFIX,mensura.cdn-apple.com
 DOMAIN-SUFFIX,mesu-cdn.apple.com.akadns.net
 DOMAIN-SUFFIX,mesu-china.apple.com.akadns.net
 DOMAIN-SUFFIX,mesu.apple.com
