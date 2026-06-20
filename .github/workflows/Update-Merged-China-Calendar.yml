@@ -19,31 +19,47 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v6
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+
+          git init .
+          git remote add origin "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          git fetch --prune --no-tags --depth=1 origin "+refs/heads/main:refs/remotes/origin/main"
+          git checkout -B main origin/main
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
       - name: Merge calendar sources
         shell: bash
         run: |
+          set -euo pipefail
+
           python3 - <<'PY'
           import hashlib
           import re
+          import sys
           import urllib.request
+          import urllib.error
           from datetime import datetime, timezone, timedelta, date
           from pathlib import Path
 
           OUTPUT_FILE = Path("Calendar/china-holidays.ics")
 
-          # iCloud 为主，调休 Pro 只补漏
           SOURCES = [
               {
                   "name": "Apple 中国大陆节假日",
                   "url": "https://calendars.icloud.com/holidays/cn_zh.ics",
                   "priority": 1,
+                  "required": True,
               },
               {
                   "name": "中国节假日调休 Pro",
                   "url": "https://kyzsalist.cn/appleics/download.php?type=external&file=jie_jia_ri_pro.ics",
                   "priority": 2,
+                  "required": False,
               },
           ]
 
@@ -51,32 +67,69 @@ jobs:
           PROD_ID = "-//Luke-Lab666//ProxyKit China Calendar//CN"
           UID_DOMAIN = "proxykit.obliviatedig.top"
 
-          def fetch_text(url: str) -> str:
-              req = urllib.request.Request(
-                  url,
-                  headers={
-                      "User-Agent": "Mozilla/5.0 (GitHub Actions; ProxyKit Calendar Updater)",
-                      "Accept": "text/calendar,text/plain,*/*",
-                      "Cache-Control": "no-cache",
-                  },
-              )
+          def log(message: str) -> None:
+              print(message, flush=True)
 
-              with urllib.request.urlopen(req, timeout=90) as resp:
-                  data = resp.read()
+          def warn(message: str) -> None:
+              print(f"::warning::{message}", flush=True)
 
-              for encoding in ("utf-8-sig", "utf-8", "gb18030"):
-                  try:
-                      text = data.decode(encoding)
-                      break
-                  except UnicodeDecodeError:
-                      continue
-              else:
-                  text = data.decode("utf-8", errors="replace")
+          def fail(message: str) -> None:
+              print(f"::error::{message}", flush=True)
+              sys.exit(1)
 
-              if "BEGIN:VCALENDAR" not in text or "BEGIN:VEVENT" not in text:
-                  raise RuntimeError(f"Invalid ICS content from {url}")
+          def fetch_text(source: dict) -> str | None:
+              name = source["name"]
+              url = source["url"]
+              required = source["required"]
 
-              return text
+              headers = {
+                  "User-Agent": "Mozilla/5.0 (GitHub Actions; ProxyKit Calendar Updater)",
+                  "Accept": "text/calendar,text/plain,*/*",
+                  "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8",
+                  "Cache-Control": "no-cache",
+              }
+
+              req = urllib.request.Request(url, headers=headers)
+
+              try:
+                  with urllib.request.urlopen(req, timeout=120) as resp:
+                      status = getattr(resp, "status", None)
+                      content_type = resp.headers.get("Content-Type", "")
+                      data = resp.read()
+
+                  log(f"{name}: HTTP {status}, Content-Type={content_type}, Bytes={len(data)}")
+
+                  text = None
+                  for encoding in ("utf-8-sig", "utf-8", "gb18030", "big5"):
+                      try:
+                          text = data.decode(encoding)
+                          break
+                      except UnicodeDecodeError:
+                          continue
+
+                  if text is None:
+                      text = data.decode("utf-8", errors="replace")
+
+                  if "BEGIN:VCALENDAR" not in text or "BEGIN:VEVENT" not in text:
+                      preview = text[:300].replace("\n", "\\n").replace("\r", "\\r")
+                      message = f"{name} 返回的不是有效 ICS。Preview: {preview}"
+
+                      if required:
+                          fail(message)
+
+                      warn(message)
+                      return None
+
+                  return text
+
+              except Exception as exc:
+                  message = f"{name} 下载失败：{type(exc).__name__}: {exc}"
+
+                  if required:
+                      fail(message)
+
+                  warn(message)
+                  return None
 
           def normalize_newlines(text: str) -> str:
               return text.replace("\r\n", "\n").replace("\r", "\n")
@@ -183,8 +236,6 @@ jobs:
               text = unescape_ical_text(summary).lower()
               text = re.sub(r"[\s\-_/（）()【】\[\]·•,，。:：]+", "", text)
 
-              # 只消除展示类后缀，不消除“补班 / 班 / 调休”
-              # 避免把补班日误判成节假日重复事件
               for token in ("假期", "放假", "休假"):
                   text = text.replace(token, "")
 
@@ -288,8 +339,6 @@ jobs:
               summary = key[2]
               date_range = event_date_range(event)
 
-              # iCloud 已有同名、同日期范围重叠事件时，后面的 Pro 源跳过
-              # 但“补班 / 调休 / 上班”不会被吃掉，因为 summary 不同
               if summary:
                   for item in accepted_meta:
                       if item["summary"] == summary and overlaps(date_range, item["range"]):
@@ -302,20 +351,27 @@ jobs:
           exact_keys: set[tuple[str, str, str, str, str]] = set()
           timezone_components: list[list[str]] = []
           timezone_seen: set[str] = set()
+          used_sources: list[str] = []
 
           for source in sorted(SOURCES, key=lambda item: item["priority"]):
-              print(f"Fetching: {source['name']}")
-              text = fetch_text(source["url"])
+              log(f"Fetching: {source['name']}")
+
+              text = fetch_text(source)
+              if text is None:
+                  continue
+
+              used_sources.append(source["name"])
               lines = unfold_ical(text)
 
               for tz in extract_components(lines, "VTIMEZONE"):
                   tz_key = "\n".join(tz)
+
                   if tz_key not in timezone_seen:
                       timezone_seen.add(tz_key)
                       timezone_components.append(tz)
 
               events = extract_components(lines, "VEVENT")
-              print(f"Found {len(events)} events from {source['name']}")
+              log(f"{source['name']}: Found {len(events)} events")
 
               for event in events:
                   if should_skip_event(event, accepted_meta, exact_keys):
@@ -334,7 +390,7 @@ jobs:
                   all_events.append(stamped)
 
           if not all_events:
-              raise RuntimeError("No VEVENT found after merging. Refusing to write empty calendar.")
+              fail("没有合并到任何 VEVENT，拒绝写入空日历。")
 
           all_events.sort(key=event_sort_key)
 
@@ -351,6 +407,7 @@ jobs:
               "X-WR-CALDESC:以 iCloud 中国大陆节假日为主，合并节假日调休 Pro 作为补充，自动去重并保留补班/调休信息。",
               "X-PUBLISHED-TTL:PT24H",
               f"X-UPDATED-AT:{now}",
+              f"X-SOURCE-LIST:{' / '.join(used_sources)}",
           ]
 
           for tz in timezone_components:
@@ -364,15 +421,15 @@ jobs:
           OUTPUT_FILE.parent.mkdir(parents=True, exist_ok=True)
           OUTPUT_FILE.write_text(write_ical(output_lines), encoding="utf-8")
 
-          print(f"Wrote {OUTPUT_FILE}")
-          print(f"Merged events: {len(all_events)}")
+          log(f"Wrote: {OUTPUT_FILE}")
+          log(f"Used sources: {', '.join(used_sources)}")
+          log(f"Merged events: {len(all_events)}")
           PY
 
       - name: Commit and push changes
         shell: bash
         run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          set -euo pipefail
 
           git add Calendar/china-holidays.ics
 
@@ -382,4 +439,4 @@ jobs:
           fi
 
           git commit -m "Update merged China holiday calendar"
-          git push
+          git push origin main
