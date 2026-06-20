@@ -1,0 +1,55 @@
+# NAME: LAN
+# AUTHOR: Luke-Lab666
+# REPO: https://github.com/Luke-Lab666/ProxyKit
+# UPDATED: 2026-06-20 02:18:36 UTC
+# DESC: Local area network, private address, loopback, link-local, multicast and local discovery rules.
+# FORMAT: Surge Rule Set
+
+# Local hostnames / local discovery
+DOMAIN,localhost
+DOMAIN-SUFFIX,localhost
+DOMAIN-SUFFIX,local
+DOMAIN-SUFFIX,localdomain
+DOMAIN-SUFFIX,lan
+DOMAIN-SUFFIX,home.arpa
+DOMAIN-SUFFIX,in-addr.arpa
+DOMAIN-SUFFIX,ip6.arpa
+
+# IPv4 loopback
+IP-CIDR,127.0.0.0/8,no-resolve
+
+# IPv4 private networks RFC1918
+IP-CIDR,10.0.0.0/8,no-resolve
+IP-CIDR,172.16.0.0/12,no-resolve
+IP-CIDR,192.168.0.0/16,no-resolve
+
+# IPv4 link-local / local broadcast
+IP-CIDR,169.254.0.0/16,no-resolve
+IP-CIDR,255.255.255.255/32,no-resolve
+
+# IPv4 CGNAT / shared address space
+IP-CIDR,100.64.0.0/10,no-resolve
+
+# IPv4 benchmark / documentation / reserved local-use ranges
+IP-CIDR,192.0.0.0/24,no-resolve
+IP-CIDR,192.0.2.0/24,no-resolve
+IP-CIDR,198.18.0.0/15,no-resolve
+IP-CIDR,198.51.100.0/24,no-resolve
+IP-CIDR,203.0.113.0/24,no-resolve
+IP-CIDR,224.0.0.0/4,no-resolve
+IP-CIDR,240.0.0.0/4,no-resolve
+
+# IPv6 loopback / unspecified
+IP-CIDR6,::1/128,no-resolve
+IP-CIDR6,::/128,no-resolve
+
+# IPv6 unique-local / link-local / multicast
+IP-CIDR6,fc00::/7,no-resolve
+IP-CIDR6,fe80::/10,no-resolve
+IP-CIDR6,ff00::/8,no-resolve
+
+# IPv6 documentation / 6to4 / Teredo / discard
+IP-CIDR6,2001:db8::/32,no-resolve
+IP-CIDR6,2002::/16,no-resolve
+IP-CIDR6,2001::/32,no-resolve
+IP-CIDR6,100::/64,no-resolve
