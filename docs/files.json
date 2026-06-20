@@ -1,0 +1,136 @@
+[
+  {
+    "title": "规则",
+    "desc": "分流规则、域名规则、IP 规则。",
+    "icon": "R",
+    "folder": "Rule",
+    "files": [
+      {
+        "name": "AGI",
+        "path": "Rule/AGI",
+        "updatedAt": "2026-06-19T21:40:30Z"
+      },
+      {
+        "name": "APNs",
+        "path": "Rule/APNs",
+        "updatedAt": "2026-06-19T22:14:07Z"
+      },
+      {
+        "name": "AppleCN",
+        "path": "Rule/AppleCN",
+        "updatedAt": "2026-06-19T22:14:07Z"
+      },
+      {
+        "name": "AppleFull",
+        "path": "Rule/AppleFull",
+        "updatedAt": "2026-06-19T22:14:07Z"
+      },
+      {
+        "name": "CN",
+        "path": "Rule/CN",
+        "updatedAt": "2026-06-19T23:12:36Z"
+      },
+      {
+        "name": "GeoIP",
+        "path": "Rule/GeoIP",
+        "updatedAt": "2026-06-14T15:55:44+08:00"
+      },
+      {
+        "name": "GeoIP-CN.mmdb",
+        "path": "Rule/GeoIP-CN.mmdb",
+        "updatedAt": "2026-06-19T23:12:36Z"
+      },
+      {
+        "name": "Net-Info-D",
+        "path": "Rule/Net-Info-D",
+        "updatedAt": "2026-06-14T15:56:08+08:00"
+      },
+      {
+        "name": "Net-Info-G",
+        "path": "Rule/Net-Info-G",
+        "updatedAt": "2026-06-14T15:56:32+08:00"
+      },
+      {
+        "name": "NotGeoIP",
+        "path": "Rule/NotGeoIP",
+        "updatedAt": "2026-06-14T15:56:52+08:00"
+      },
+      {
+        "name": "REJECT",
+        "path": "Rule/REJECT",
+        "updatedAt": "2026-06-14T15:57:28+08:00"
+      },
+      {
+        "name": "Telegram",
+        "path": "Rule/Telegram",
+        "updatedAt": "2026-06-14T17:30:32+08:00"
+      }
+    ]
+  },
+  {
+    "title": "脚本",
+    "desc": "JavaScript 脚本和响应改写。",
+    "icon": "JS",
+    "folder": "Scripts",
+    "files": [
+      {
+        "name": "dns-lite.js",
+        "path": "Scripts/dns-lite.js",
+        "updatedAt": "2026-06-14T16:33:14+08:00"
+      },
+      {
+        "name": "kill-connections-lite.js",
+        "path": "Scripts/kill-connections-lite.js",
+        "updatedAt": "2026-06-19T08:58:50+08:00"
+      },
+      {
+        "name": "youtube.js",
+        "path": "Scripts/youtube.js",
+        "updatedAt": "2026-06-14T20:03:02+08:00"
+      },
+      {
+        "name": "youtube.response.js",
+        "path": "Scripts/youtube.response.js",
+        "updatedAt": "2026-06-14T19:52:05+08:00"
+      }
+    ]
+  },
+  {
+    "title": "模块",
+    "desc": "Surge 模块和相关配置。",
+    "icon": "M",
+    "folder": "SurgeModule",
+    "files": [
+      {
+        "name": "AntiFQAD",
+        "path": "SurgeModule/AntiFQAD",
+        "updatedAt": "2026-06-19T10:16:32+08:00"
+      },
+      {
+        "name": "BlockHTTPDNS",
+        "path": "SurgeModule/BlockHTTPDNS",
+        "updatedAt": "2026-06-19T10:01:59+08:00"
+      },
+      {
+        "name": "DNS Lite",
+        "path": "SurgeModule/DNS Lite",
+        "updatedAt": "2026-06-14T17:38:59+08:00"
+      },
+      {
+        "name": "kill-connections-lite.sgmodule",
+        "path": "SurgeModule/kill-connections-lite.sgmodule",
+        "updatedAt": "2026-06-19T08:59:21+08:00"
+      },
+      {
+        "name": "YouTubeEnhance",
+        "path": "SurgeModule/YouTubeEnhance",
+        "updatedAt": "2026-06-14T19:58:25+08:00"
+      },
+      {
+        "name": "YouTube去广告",
+        "path": "SurgeModule/YouTube去广告",
+        "updatedAt": "2026-06-14T20:04:50+08:00"
+      }
+    ]
+  }
+]
