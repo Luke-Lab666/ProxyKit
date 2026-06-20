@@ -889,11 +889,11 @@ jobs:
 
                 .logo {{
                   background:
-                    linear-gradient(135deg, #f3dd9a 0%, #d6aa4f 45%, #9b651f 100%);
+                    linear-gradient(135deg, #ead08a 0%, #c8953f 48%, #76501e 100%);
                   color: #120d05;
                   box-shadow:
-                    0 14px 30px rgba(168, 111, 34, .22),
-                    inset 0 1px 0 rgba(255, 255, 255, .24);
+                    0 14px 30px rgba(168, 111, 34, .18),
+                    inset 0 1px 0 rgba(255, 255, 255, .20);
                 }}
 
                 .repo-link:hover {{
@@ -952,16 +952,26 @@ jobs:
                 }}
 
                 .tab.active,
-                .primary-dark,
-                .primary-blue,
+                .action.primary-dark,
+                .action.primary-blue,
                 .toast {{
                   background:
-                    linear-gradient(135deg, #f1dc9a 0%, #d2a64d 46%, #9b651f 100%);
+                    linear-gradient(135deg, #d9bd73 0%, #b98735 52%, #76501e 100%);
                   color: #120d05;
-                  border-color: rgba(241, 220, 154, .68);
+                  border-color: rgba(232, 201, 122, .46);
+                  text-shadow: none;
                   box-shadow:
-                    0 15px 34px rgba(168, 111, 34, .22),
-                    inset 0 1px 0 rgba(255, 255, 255, .26);
+                    0 12px 26px rgba(168, 111, 34, .18),
+                    inset 0 1px 0 rgba(255, 255, 255, .18);
+                }}
+
+                .tab.active:hover,
+                .action.primary-dark:hover,
+                .action.primary-blue:hover {{
+                  background:
+                    linear-gradient(135deg, #e4c984 0%, #c4923c 52%, #845820 100%);
+                  color: #100b04;
+                  border-color: rgba(232, 201, 122, .58);
                 }}
 
                 .card {{
