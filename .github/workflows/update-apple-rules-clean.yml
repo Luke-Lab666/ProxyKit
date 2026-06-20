@@ -4,7 +4,6 @@ on:
   schedule:
     # 每天 21:20 UTC 运行一次，大约北京时间 05:20
     - cron: "20 21 * * *"
-
   workflow_dispatch:
 
 permissions:
@@ -47,10 +46,9 @@ jobs:
           }
 
           SOURCES = {
-              "AppleCN": [
-                  "https://raw.githubusercontent.com/Loyalsoldier/surge-rules/release/ruleset/apple.txt",
-                  "https://raw.githubusercontent.com/Loyalsoldier/surge-rules/release/ruleset/icloud.txt",
-              ],
+              # AppleCN 现在只保留 iCloud CN，不再拉 apple.txt / icloud.txt，避免混入全球 iCloud。
+              "AppleCN": [],
+
               "AppleFull": [
                   "https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Surge/Apple/Apple.list",
                   "https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Surge/AppStore/AppStore.list",
@@ -79,20 +77,17 @@ jobs:
           ]
 
           SEED = {
+              # 这里就是 Rule/AppleCN 的全部内容：只保留 iCloud CN。
               "AppleCN": [
-                  ("DOMAIN-SUFFIX", "apple.com.cn", ""),
-                  ("DOMAIN-SUFFIX", "cdn-apple.com", ""),
-                  ("DOMAIN-SUFFIX", "mzstatic.com", ""),
-                  ("DOMAIN-SUFFIX", "aaplimg.com", ""),
-                  ("DOMAIN", "www.apple.com", ""),
-                  ("DOMAIN", "apps.apple.com", ""),
-                  ("DOMAIN", "itunes.apple.com", ""),
-                  ("DOMAIN", "updates.cdn-apple.com", ""),
-                  ("DOMAIN", "swcdn.apple.com", ""),
-                  ("DOMAIN", "mesu.apple.com", ""),
-                  ("DOMAIN", "ocsp.apple.com", ""),
-                  ("DOMAIN", "valid.apple.com", ""),
+                  ("DOMAIN-SUFFIX", "apple-icloud.cn", ""),
+                  ("DOMAIN-SUFFIX", "appleicloud.cn", ""),
+                  ("DOMAIN-SUFFIX", "icloud-apple.cn", ""),
+                  ("DOMAIN-SUFFIX", "icloud.cn", ""),
+                  ("DOMAIN-SUFFIX", "icloud.com.cn", ""),
+                  ("DOMAIN-SUFFIX", "icloud.net.cn", ""),
+                  ("DOMAIN-SUFFIX", "icloudapple.cn", ""),
               ],
+
               "AppleFull": [
                   ("DOMAIN-SUFFIX", "apple.com", ""),
                   ("DOMAIN-SUFFIX", "apple.com.cn", ""),
@@ -126,6 +121,7 @@ jobs:
           }
 
           DOMAIN_RE = re.compile(r"^[a-z0-9*][a-z0-9*_.-]*[a-z0-9]$", re.I)
+
           RULE_RE = re.compile(
               r"\b(DOMAIN|DOMAIN-SUFFIX|DOMAIN-KEYWORD|IP-CIDR|IP-CIDR6),([^,\s#]+)(?:,(no-resolve))?",
               re.I,
@@ -195,11 +191,9 @@ jobs:
 
           def parse_rules_from_text(text):
               rules = set()
-
               for match in RULE_RE.finditer(text):
                   rule_type, value, option = match.groups()
                   add_rule(rules, rule_type, value, option or "")
-
               return rules
 
           def remove_covered_domains(rules):
@@ -232,16 +226,13 @@ jobs:
                   "IP-CIDR": 3,
                   "IP-CIDR6": 4,
               }
-
               rule_type, value, option = rule
               return (order.get(rule_type, 99), value, option)
 
           def format_rule(rule):
               rule_type, value, option = rule
-
               if option:
                   return f"{rule_type},{value},{option}"
-
               return f"{rule_type},{value}"
 
           def now_utc():
@@ -264,7 +255,7 @@ jobs:
               if sources:
                   header.append("# SOURCE:")
                   for source in sources:
-                      header.append(f"#   - {source}")
+                      header.append(f"# - {source}")
 
               header.append("")
 
@@ -329,7 +320,7 @@ jobs:
           write_rule_file(
               "AppleCN",
               apple_cn_rules,
-              "Apple domains usually available directly in mainland China.",
+              "China-region iCloud domains only. Global iCloud and AppleCN mixed rules are intentionally excluded.",
               SOURCES["AppleCN"],
           )
 
