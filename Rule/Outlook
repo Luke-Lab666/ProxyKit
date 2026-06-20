@@ -1,0 +1,60 @@
+# NAME: Outlook Mail iOS
+# AUTHOR: Luke-Lab666
+# UPDATED: 2026-06-20
+# PURPOSE: iOS Mail / Outlook.com / Hotmail / Microsoft 365 Exchange
+
+# > Outlook / Exchange Mail Core
+DOMAIN,outlook.office365.com
+DOMAIN,outlook.office.com
+DOMAIN,outlook.cloud.microsoft
+DOMAIN,smtp.office365.com
+DOMAIN,smtp-mail.outlook.com
+DOMAIN,imap-mail.outlook.com
+DOMAIN,pop-mail.outlook.com
+
+# > Exchange ActiveSync / Legacy Compatibility
+DOMAIN,eas.outlook.com
+DOMAIN,s.outlook.com
+DOMAIN,m.hotmail.com
+
+# > Autodiscover
+DOMAIN,autodiscover.outlook.com
+DOMAIN,autodiscover-s.outlook.com
+DOMAIN-SUFFIX,onmicrosoft.com
+
+# > Outlook / Hotmail Mail Domains
+DOMAIN-SUFFIX,outlook.com
+DOMAIN-SUFFIX,hotmail.com
+
+# > Microsoft Account Login / OAuth
+DOMAIN,login.live.com
+DOMAIN,account.live.com
+DOMAIN,signup.live.com
+DOMAIN,auth.gfx.ms
+
+# > Microsoft 365 / Azure AD Login
+DOMAIN,login.microsoft.com
+DOMAIN,login.microsoftonline.com
+DOMAIN,login.windows.net
+DOMAIN,login.microsoftonline-p.com
+DOMAIN,logincert.microsoftonline.com
+DOMAIN,loginex.microsoftonline.com
+DOMAIN,device.login.microsoftonline.com
+DOMAIN,ccs.login.microsoftonline.com
+DOMAIN,account.activedirectory.windowsazure.com
+DOMAIN,enterpriseregistration.windows.net
+DOMAIN,clientconfig.microsoftonline-p.net
+
+# > Microsoft Auth CDN
+DOMAIN-SUFFIX,msauth.net
+DOMAIN-SUFFIX,msauthimages.net
+DOMAIN-SUFFIX,msftauth.net
+DOMAIN-SUFFIX,msftauthimages.net
+DOMAIN-SUFFIX,msidentity.com
+DOMAIN-SUFFIX,msftidentity.com
+DOMAIN-SUFFIX,microsoftonline.com
+DOMAIN-SUFFIX,microsoftonline-p.com
+
+# > Optional but useful for modern account/session sync
+DOMAIN,graph.microsoft.com
+DOMAIN,graph.windows.net
