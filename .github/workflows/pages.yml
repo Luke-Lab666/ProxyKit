@@ -5,15 +5,20 @@ on:
     branches:
       - main
     paths:
+      - "docs/**"
       - "Rule/**"
       - "Scripts/**"
       - "SurgeModule/**"
-      - "docs/**"
       - ".github/workflows/pages.yml"
   workflow_dispatch:
+  workflow_run:
+    workflows:
+      - Update AGI Rule
+    types:
+      - completed
 
 permissions:
-  contents: read
+  contents: write
   pages: write
   id-token: write
 
@@ -23,6 +28,7 @@ concurrency:
 
 jobs:
   deploy:
+    if: ${{ github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
     environment:
       name: github-pages
@@ -33,69 +39,97 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          persist-credentials: true
 
-      - name: Generate static file index
-        shell: bash
+      - name: Generate docs/files.json
         run: |
           mkdir -p docs
-          python3 - <<'PY'
+          python3 <<'PY'
           import json
-          import mimetypes
-          import pathlib
           import subprocess
+          from pathlib import Path
 
-          ROOT = pathlib.Path('.')
-          FOLDERS = ['Rule', 'Scripts', 'SurgeModule']
-          IGNORE_NAMES = {'.DS_Store'}
+          categories = [
+              {
+                  "title": "规则",
+                  "desc": "分流规则、域名规则、IP 规则。",
+                  "icon": "R",
+                  "folder": "Rule",
+              },
+              {
+                  "title": "脚本",
+                  "desc": "JavaScript 脚本和响应改写。",
+                  "icon": "JS",
+                  "folder": "Scripts",
+              },
+              {
+                  "title": "模块",
+                  "desc": "Surge 模块和相关配置。",
+                  "icon": "M",
+                  "folder": "SurgeModule",
+              },
+          ]
 
-          def git_updated_at(path: str) -> str:
+          def last_commit_time(path: str) -> str:
               try:
                   return subprocess.check_output(
-                      ['git', 'log', '-1', '--format=%cI', '--', path],
+                      ["git", "log", "-1", "--format=%cI", "--", path],
                       text=True,
                       stderr=subprocess.DEVNULL,
                   ).strip()
               except Exception:
-                  return ''
+                  return ""
 
-          def file_size(path: pathlib.Path) -> int:
-              try:
-                  return path.stat().st_size
-              except OSError:
-                  return 0
+          output = []
 
-          files = []
-          for folder in FOLDERS:
-              base = ROOT / folder
-              if not base.exists():
-                  continue
+          for category in categories:
+              folder = Path(category["folder"])
+              files = []
 
-              for item in sorted(base.rglob('*')):
-                  if not item.is_file():
-                      continue
-                  if item.name in IGNORE_NAMES:
-                      continue
+              if folder.exists():
+                  for item in sorted(folder.rglob("*"), key=lambda p: p.as_posix().lower()):
+                      if not item.is_file():
+                          continue
 
-                  rel = item.as_posix()
-                  mime, _ = mimetypes.guess_type(rel)
-                  files.append({
-                      'name': item.name,
-                      'path': rel,
-                      'folder': folder,
-                      'ext': item.suffix[1:].lower(),
-                      'size': file_size(item),
-                      'mime': mime or '',
-                      'updatedAt': git_updated_at(rel),
-                  })
+                      path = item.as_posix()
+                      files.append({
+                          "name": item.name,
+                          "path": path,
+                          "updatedAt": last_commit_time(path),
+                      })
 
-          output = ROOT / 'docs' / 'files.json'
-          output.write_text(
-              json.dumps(files, ensure_ascii=False, indent=2) + '\n',
-              encoding='utf-8',
+              output.append({
+                  "title": category["title"],
+                  "desc": category["desc"],
+                  "icon": category["icon"],
+                  "folder": category["folder"],
+                  "files": files,
+              })
+
+          Path("docs/files.json").write_text(
+              json.dumps(output, ensure_ascii=False, indent=2) + "\n",
+              encoding="utf-8",
           )
-          print(f'Generated {output} with {len(files)} files')
           PY
+
           touch docs/.nojekyll
+
+      - name: Commit generated index
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/files.json docs/.nojekyll
+          if git diff --cached --quiet; then
+            echo "files.json is already up to date"
+          else
+            git commit -m "chore: update pages file index [skip ci]"
+            git push
+          fi
+
+      - name: Check Pages files
+        run: |
+          echo "Generated files:"
+          find docs -maxdepth 2 -type f | sort
           test -f docs/index.html
           test -f docs/files.json
 
