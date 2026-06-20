@@ -5,6 +5,9 @@ on:
     branches:
       - main
     paths:
+      - "Rule/**"
+      - "Scripts/**"
+      - "SurgeModule/**"
       - "docs/**"
       - ".github/workflows/pages.yml"
   workflow_dispatch:
@@ -28,11 +31,73 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
-      - name: Prepare Pages files
+      - name: Generate static file index
+        shell: bash
         run: |
+          mkdir -p docs
+          python3 - <<'PY'
+          import json
+          import mimetypes
+          import pathlib
+          import subprocess
+
+          ROOT = pathlib.Path('.')
+          FOLDERS = ['Rule', 'Scripts', 'SurgeModule']
+          IGNORE_NAMES = {'.DS_Store'}
+
+          def git_updated_at(path: str) -> str:
+              try:
+                  return subprocess.check_output(
+                      ['git', 'log', '-1', '--format=%cI', '--', path],
+                      text=True,
+                      stderr=subprocess.DEVNULL,
+                  ).strip()
+              except Exception:
+                  return ''
+
+          def file_size(path: pathlib.Path) -> int:
+              try:
+                  return path.stat().st_size
+              except OSError:
+                  return 0
+
+          files = []
+          for folder in FOLDERS:
+              base = ROOT / folder
+              if not base.exists():
+                  continue
+
+              for item in sorted(base.rglob('*')):
+                  if not item.is_file():
+                      continue
+                  if item.name in IGNORE_NAMES:
+                      continue
+
+                  rel = item.as_posix()
+                  mime, _ = mimetypes.guess_type(rel)
+                  files.append({
+                      'name': item.name,
+                      'path': rel,
+                      'folder': folder,
+                      'ext': item.suffix[1:].lower(),
+                      'size': file_size(item),
+                      'mime': mime or '',
+                      'updatedAt': git_updated_at(rel),
+                  })
+
+          output = ROOT / 'docs' / 'files.json'
+          output.write_text(
+              json.dumps(files, ensure_ascii=False, indent=2) + '\n',
+              encoding='utf-8',
+          )
+          print(f'Generated {output} with {len(files)} files')
+          PY
           touch docs/.nojekyll
           test -f docs/index.html
+          test -f docs/files.json
 
       - name: Configure Pages
         uses: actions/configure-pages@v5
