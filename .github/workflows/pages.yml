@@ -8,11 +8,14 @@ on:
       - "Rule/**"
       - "Scripts/**"
       - "SurgeModule/**"
+      - "Calendar/**"
       - ".github/workflows/pages.yml"
+      - ".github/workflows/update-calendar.yml"
   workflow_dispatch:
   workflow_run:
     workflows:
       - Update AGI Rule
+      - Update Calendar
     types:
       - completed
 
@@ -27,7 +30,6 @@ jobs:
   deploy:
     if: ${{ github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout repository without Node actions
         env:
@@ -46,12 +48,11 @@ jobs:
           set -euo pipefail
           rm -rf /tmp/proxykit-pages
           mkdir -p /tmp/proxykit-pages
-
           python3 <<'PY'
+          import html
           import json
           import subprocess
           from pathlib import Path
-          from html import escape
           from urllib.parse import quote
 
           OWNER = "Luke-Lab666"
@@ -61,9 +62,24 @@ jobs:
           GH_BASE = f"https://github.com/{OWNER}/{REPO}/blob/{BRANCH}/"
 
           CATEGORIES = [
-              {"key": "Rule", "title": "规则", "icon": "R"},
-              {"key": "Scripts", "title": "脚本", "icon": "JS"},
-              {"key": "SurgeModule", "title": "模块", "icon": "M"},
+              {"key": "Rule", "title": "规则", "icon": "R", "type": "normal"},
+              {"key": "Scripts", "title": "脚本", "icon": "JS", "type": "normal"},
+              {"key": "SurgeModule", "title": "模块", "icon": "M", "type": "normal"},
+              {"key": "Calendar", "title": "日历", "icon": "C", "type": "calendar"},
+          ]
+
+          CALENDAR_FILE = "Calendar/cn-mainland-holidays-2026-cn-full-v2.ics"
+          CALENDAR_REPO = GH_BASE + quote(CALENDAR_FILE)
+          CALENDAR_RAW = RAW_BASE + quote(CALENDAR_FILE)
+          CALENDAR_WEBCAL = CALENDAR_RAW.replace("https://", "webcal://", 1)
+          CALENDAR_TITLE = "中国大陆节假日与中国纪念日 2026"
+          CALENDAR_DESC = "中国大陆 2026 法定节假日、调休、中国传统节日、二十四节气、中国常用纪念日。"
+          CALENDAR_COUNTS = [
+              ("放假", 7, "holiday"),
+              ("调休上班", 6, "workday"),
+              ("传统节日", 22, "traditional"),
+              ("节气", 24, "solar"),
+              ("纪念日", 28, "memorial"),
           ]
 
           def quote_path(path: str) -> str:
@@ -82,28 +98,28 @@ jobs:
           def short_time(value: str) -> str:
               if not value:
                   return "更新时间未知"
-              value = value.replace("T", " ")
+              value = value.replace("T", " ").replace("Z", "")
               if "+" in value:
                   value = value.split("+", 1)[0]
-              value = value.replace("Z", "")
               return "更新：" + value[:16].replace("-", "/")
+
+          def esc(value) -> str:
+              return html.escape(str(value), quote=True)
 
           files = []
           grouped = []
-
           for category in CATEGORIES:
+              if category["type"] != "normal":
+                  continue
               folder = Path(category["key"])
               items = []
-
               if folder.exists():
                   for item in sorted(folder.rglob("*"), key=lambda p: p.as_posix().lower()):
                       if not item.is_file():
                           continue
-
                       path = item.as_posix()
                       updated = last_commit_time(path)
                       raw = RAW_BASE + quote_path(path)
-
                       data = {
                           "name": item.name,
                           "path": path,
@@ -116,311 +132,301 @@ jobs:
                           "github": GH_BASE + quote_path(path),
                           "install": "surge:///install-module?url=" + raw if category["key"] == "SurgeModule" and item.name.endswith(".sgmodule") else "",
                       }
-
                       files.append(data)
                       items.append(data)
+              grouped.append({"title": category["title"], "folder": category["key"], "files": items})
 
-              grouped.append({
-                  "title": category["title"],
-                  "folder": category["key"],
-                  "files": items,
-              })
+          calendar_updated = last_commit_time(CALENDAR_FILE)
+          calendar_updated_text = short_time(calendar_updated)
+          calendar_exists = Path(CALENDAR_FILE).exists()
+          calendar_size = Path(CALENDAR_FILE).stat().st_size if calendar_exists else 0
+          calendar_meta = {
+              "title": "日历",
+              "folder": "Calendar",
+              "files": [{
+                  "name": "中国大陆节假日与中国纪念日 2026",
+                  "path": CALENDAR_FILE,
+                  "folder": "Calendar",
+                  "title": "日历",
+                  "icon": "C",
+                  "updatedAt": calendar_updated,
+                  "updatedText": calendar_updated_text,
+                  "raw": CALENDAR_RAW,
+                  "webcal": CALENDAR_WEBCAL,
+                  "github": CALENDAR_REPO,
+                  "count": 87,
+                  "size": calendar_size,
+              }],
+          }
+          grouped.append(calendar_meta)
 
           def file_card(file):
-              install = f'<a class="btn small" href="{escape(file["install"])}">安装</a>' if file["install"] else ""
-              search = escape((file["name"] + " " + file["path"] + " " + file["title"]).lower())
-              return f"""
-                <article class="file-card" data-folder="{escape(file["folder"])}" data-search="{search}">
-                  <div class="file-top">
-                    <span class="file-icon">{escape(file["icon"])}</span>
-                    <span class="file-type">{escape(file["title"])}</span>
+              install = f'<a class="action" href="{esc(file["install"])}">安装</a>' if file["install"] else ""
+              search = esc((file["name"] + " " + file["path"] + " " + file["title"]).lower())
+              return f'''
+                <article class="card file-card" data-folder="{esc(file['folder'])}" data-search="{search}">
+                  <div class="card-head">
+                    <span class="file-icon">{esc(file['icon'])}</span>
+                    <span class="type-pill">{esc(file['title'])}</span>
                   </div>
-                  <h3>{escape(file["name"])}</h3>
-                  <p class="path">{escape(file["path"])}</p>
-                  <p class="time">{escape(file["updatedText"])}</p>
+                  <h3>{esc(file['name'])}</h3>
+                  <p class="path">{esc(file['path'])}</p>
+                  <p class="updated">{esc(file['updatedText'])}</p>
                   <div class="actions">
-                    <a class="btn dark" href="{escape(file["raw"])}" target="_blank" rel="noopener">原始链接</a>
-                    <a class="btn small" href="{escape(file["github"])}" target="_blank" rel="noopener">仓库页</a>
+                    <a class="action primary-dark" href="{esc(file['raw'])}">原始链接</a>
+                    <a class="action" href="{esc(file['github'])}">仓库页</a>
                     {install}
-                    <button class="btn small" type="button" data-copy="{escape(file["raw"])}">复制</button>
+                    <button class="action copy-btn" type="button" data-copy="{esc(file['raw'])}">复制</button>
                   </div>
-                </article>
-              """
+                </article>'''
 
-          cards_html = "\n".join(file_card(file) for file in files)
+          def calendar_card():
+              chips = "".join(f'<span class="cal-chip {cls}">{name} <b>{count}</b></span>' for name, count, cls in CALENDAR_COUNTS)
+              search = esc("calendar 日历 中国大陆 节假日 调休 传统节日 节气 纪念日 ios 订阅".lower())
+              return f'''
+                <article class="card calendar-card" data-folder="Calendar" data-search="{search}">
+                  <div class="card-head">
+                    <span class="file-icon calendar-icon">C</span>
+                    <span class="type-pill">日历</span>
+                  </div>
+                  <h3>{esc(CALENDAR_TITLE)}</h3>
+                  <p class="cal-desc">{esc(CALENDAR_DESC)}</p>
+                  <div class="cal-chips">{chips}</div>
+                  <div class="actions cal-actions">
+                    <a class="action primary-blue" href="{esc(CALENDAR_WEBCAL)}">iOS 订阅</a>
+                    <a class="action" href="{esc(CALENDAR_RAW)}">Raw .ics</a>
+                    <a class="action" href="{esc(CALENDAR_REPO)}">仓库文件</a>
+                    <button class="action copy-btn" type="button" data-copy="{esc(CALENDAR_WEBCAL)}">复制订阅</button>
+                  </div>
+                  <p class="updated cal-meta">事件数：87 · {esc(calendar_updated_text)} · GitHub Actions 自动更新</p>
+                </article>'''
+
+          cards_html = "\n".join(file_card(file) for file in files) + "\n" + calendar_card()
           total = len(files)
+          categories_json = json.dumps(grouped, ensure_ascii=False, indent=2)
 
-          index_html = f"""<!doctype html>
+          index_html = f'''<!doctype html>
           <html lang="zh-CN">
           <head>
-            <meta charset="utf-8" />
-            <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-            <meta name="theme-color" content="#f4e2b7" />
-            <title>ProxyKit · 规则 / 脚本 / 模块</title>
+            <meta charset="utf-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+            <title>ProxyKit · 规则 / 脚本 / 模块 / 日历</title>
             <style>
               :root {{
-                --ink:#111;
-                --muted:#7a7468;
-                --line:rgba(20,20,20,.10);
+                color-scheme: light;
+                --bg: #f6efd9;
+                --bg2: #fffaf0;
+                --text: #111318;
+                --muted: #7b7a70;
+                --card: rgba(255, 255, 255, .72);
+                --card-solid: #fffdf7;
+                --line: rgba(17, 19, 24, .09);
+                --line-strong: rgba(17, 19, 24, .14);
+                --black: #111318;
+                --blue: #1677ff;
+                --shadow: 0 18px 42px rgba(48, 41, 20, .10);
               }}
-              * {{ box-sizing:border-box; }}
-              html {{ scroll-behavior:smooth; }}
+              @media (prefers-color-scheme: dark) {{
+                :root {{
+                  color-scheme: dark;
+                  --bg: #12110d;
+                  --bg2: #1b1812;
+                  --text: #f6f1e7;
+                  --muted: #ada495;
+                  --card: rgba(35, 32, 26, .72);
+                  --card-solid: #211f19;
+                  --line: rgba(255, 255, 255, .10);
+                  --line-strong: rgba(255, 255, 255, .16);
+                  --black: #f6f1e7;
+                  --blue: #5aa2ff;
+                  --shadow: 0 18px 44px rgba(0, 0, 0, .30);
+                }}
+              }}
+              * {{ box-sizing: border-box; }}
               body {{
-                margin:0;
-                min-height:100vh;
-                color:var(--ink);
-                font:15px/1.5 ui-sans-serif,-apple-system,BlinkMacSystemFont,"SF Pro Display","SF Pro Text","Segoe UI",Roboto,"PingFang SC","Microsoft YaHei",Arial,sans-serif;
-                background:linear-gradient(180deg,#fbf2dc 0%,#f2dfb4 48%,#e9cb8d 100%);
-                overflow-x:hidden;
-              }}
-              body::before,body::after {{
-                content:"";
-                position:fixed;
-                inset:-12%;
-                z-index:-1;
-                pointer-events:none;
-                filter:blur(18px);
-                animation:float 16s ease-in-out infinite alternate;
-              }}
-              body::before {{
+                margin: 0;
+                min-height: 100vh;
+                color: var(--text);
+                font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Segoe UI", sans-serif;
                 background:
-                  radial-gradient(circle at 16% 18%,rgba(255,255,255,.78),transparent 30%),
-                  radial-gradient(circle at 78% 22%,rgba(245,199,89,.35),transparent 34%),
-                  radial-gradient(circle at 30% 82%,rgba(201,144,35,.18),transparent 30%);
+                  radial-gradient(circle at 14% 8%, rgba(255, 255, 255, .96), transparent 28%),
+                  radial-gradient(circle at 88% 7%, rgba(246, 200, 86, .30), transparent 28%),
+                  radial-gradient(circle at 50% 0%, rgba(255, 250, 230, .78), transparent 42%),
+                  linear-gradient(180deg, var(--bg2), var(--bg));
               }}
-              body::after {{
-                background:
-                  radial-gradient(circle at 72% 70%,rgba(255,247,223,.30),transparent 32%),
-                  linear-gradient(135deg,rgba(255,255,255,.13),rgba(219,166,51,.09));
-                animation-duration:22s;
-              }}
-              @keyframes float {{
-                from {{ transform:translate3d(-1%,-1%,0) scale(1); }}
-                to {{ transform:translate3d(1.2%,1%,0) scale(1.05); }}
-              }}
-              a {{ color:inherit; text-decoration:none; }}
-              button,input {{ font:inherit; }}
-              .shell {{ width:min(calc(100% - 32px),1120px); margin:0 auto; }}
-              .nav {{
-                margin-top:20px;
-                display:flex;
-                align-items:center;
-                justify-content:space-between;
-                gap:12px;
-                padding:10px 12px 10px 20px;
-                border:1px solid rgba(255,255,255,.7);
-                border-radius:999px;
-                background:rgba(255,255,255,.58);
-                backdrop-filter:blur(18px);
-                box-shadow:0 14px 40px rgba(90,65,20,.09);
-              }}
-              .brand {{ display:flex; align-items:center; gap:12px; font-size:22px; font-weight:950; letter-spacing:-.06em; }}
-              .mark {{ width:36px;height:36px;border-radius:13px;background:#111;color:#fff;display:grid;place-items:center;font-weight:950;font-size:15px; }}
-              .repo {{ border-radius:999px;background:#111;color:#fff;font-weight:900;padding:12px 18px;box-shadow:0 14px 32px rgba(0,0,0,.18); }}
-              .hero {{
-                margin-top:22px;
-                min-height:220px;
-                display:flex;
-                align-items:center;
-                justify-content:center;
-                text-align:center;
-                border:1px solid rgba(255,255,255,.72);
-                border-radius:32px;
-                background:linear-gradient(135deg,rgba(255,252,243,.92),rgba(244,221,169,.88));
-                box-shadow:0 28px 80px rgba(133,102,38,.14);
-                position:relative;
-                overflow:hidden;
-              }}
-              .hero::after {{
-                content:"";
-                position:absolute;
-                left:-8%; right:-8%; bottom:-24%;
-                height:68%;
-                background:radial-gradient(90% 100% at 50% 100%,rgba(255,247,223,.36),rgba(232,185,73,.15) 42%,transparent 72%);
-                filter:blur(16px);
-                animation:float 10s ease-in-out infinite alternate;
-              }}
-              .hero-inner {{ position:relative; z-index:1; padding:26px 18px; }}
-              h1 {{ margin:0; font-size:clamp(54px,8vw,104px); line-height:.9; letter-spacing:-.09em; font-weight:950; }}
-              .caps {{ display:flex; justify-content:center; flex-wrap:wrap; gap:12px; margin-top:20px; }}
-              .cap {{
-                display:inline-flex; align-items:center; gap:10px;
-                min-height:42px; padding:0 16px;
-                border-radius:999px;
-                border:1px solid rgba(255,255,255,.7);
-                background:rgba(255,255,255,.60);
-                box-shadow:0 16px 36px rgba(0,0,0,.07);
-                font-weight:900;
-              }}
-              .dot {{
-                width:9px;height:9px;border-radius:50%;
-                background:linear-gradient(135deg,#f9dd8a,#c9942e);
-                box-shadow:0 0 0 7px rgba(201,148,46,.14),0 0 22px rgba(201,148,46,.32);
-                animation:pulse 1.8s ease-in-out infinite;
-              }}
-              @keyframes pulse {{ 50% {{ transform:scale(1.12); opacity:.72; }} }}
-              .section {{ padding:22px 0 44px; }}
-              .title {{ font-size:42px; line-height:1; letter-spacing:-.08em; font-weight:950; margin:0 0 22px; }}
-              .chips {{ display:flex; flex-wrap:wrap; gap:10px; margin-bottom:16px; }}
-              .chip {{
-                border:1px solid var(--line); background:rgba(255,255,255,.64);
-                border-radius:999px; padding:12px 18px; font-weight:950;
-              }}
-              .chip.active {{ background:#111;color:#fff;border-color:#111; }}
-              .search {{
-                display:flex; align-items:center; gap:12px;
-                border:1px solid var(--line);
-                background:rgba(255,255,255,.65);
-                border-radius:999px;
-                padding:14px 18px;
-                margin-bottom:22px;
-              }}
-              .search input {{ border:0; outline:0; background:transparent; width:100%; color:#555; }}
-              .meta {{ margin:0 0 16px; color:var(--muted); font-weight:850; }}
-              .grid {{ display:grid; grid-template-columns:repeat(3,1fr); gap:16px; }}
-              .file-card {{
-                min-height:190px;
-                border:1px solid rgba(20,20,20,.08);
-                border-radius:24px;
-                background:rgba(255,255,255,.72);
-                box-shadow:0 18px 44px rgba(70,48,12,.08);
-                padding:18px;
-                display:flex;
-                flex-direction:column;
-              }}
-              .file-top {{ display:flex; justify-content:space-between; gap:12px; align-items:flex-start; }}
-              .file-icon {{ width:44px;height:44px;border:1px solid rgba(0,0,0,.13);border-radius:16px;display:grid;place-items:center;font-weight:950;background:rgba(255,255,255,.52); }}
-              .file-type {{ border-radius:999px;background:rgba(238,233,222,.75);padding:7px 11px;color:#8a8172;font-weight:900; }}
-              .file-card h3 {{ margin:18px 0 6px; font-size:22px; letter-spacing:-.05em; overflow-wrap:anywhere; }}
-              .path,.time {{ margin:0; color:#817a6d; font-weight:750; overflow-wrap:anywhere; }}
-              .time {{ margin-top:8px; font-size:12px; }}
-              .actions {{ display:flex; flex-wrap:wrap; gap:8px; margin-top:auto; padding-top:18px; }}
-              .btn {{ border:1px solid var(--line); background:#fff; border-radius:999px; padding:8px 12px; font-weight:950; cursor:pointer; }}
-              .btn.dark {{ background:#111;color:#fff;border-color:#111; }}
-              .btn.small {{ font-size:13px; }}
-              .empty {{ display:none; padding:28px; border:1px dashed var(--line); border-radius:22px; background:rgba(255,255,255,.52); color:var(--muted); font-weight:850; text-align:center; }}
-              .footer {{ padding:26px 0 38px; color:#817a6d; font-weight:800; border-top:1px solid rgba(20,20,20,.08); }}
-              .hidden {{ display:none; }}
-              @media (max-width:860px) {{
-                .grid {{ grid-template-columns:1fr; }}
-                .hero {{ min-height:210px; }}
-                .title {{ font-size:38px; }}
-                .repo {{ padding:11px 15px; }}
+              .wrap {{ width: min(100%, 980px); margin: 0 auto; padding: 34px 22px 48px; }}
+              .topbar {{ display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 26px; }}
+              .brand {{ display: inline-flex; align-items: center; gap: 12px; padding: 12px 18px 12px 12px; border: 1px solid var(--line); border-radius: 999px; background: rgba(255,255,255,.56); backdrop-filter: blur(18px); box-shadow: 0 12px 30px rgba(0,0,0,.04); }}
+              .logo {{ width: 44px; height: 44px; border-radius: 14px; display: grid; place-items: center; background: var(--black); color: var(--bg2); font-weight: 900; letter-spacing: -.06em; }}
+              .brand b {{ font-size: 30px; letter-spacing: -.06em; }}
+              .repo-link {{ color: var(--text); text-decoration: none; font-weight: 800; opacity: .72; }}
+              .hero {{ border: 1px solid rgba(255,255,255,.72); border-radius: 36px; padding: 48px 24px; margin-bottom: 34px; text-align: center; background: radial-gradient(circle at 50% 42%, rgba(236, 199, 82, .24), transparent 48%), rgba(255,255,255,.42); backdrop-filter: blur(22px); box-shadow: inset 0 0 0 1px rgba(255,255,255,.22); }}
+              h1 {{ margin: 0; font-size: clamp(56px, 9vw, 98px); line-height: .92; letter-spacing: -.09em; }}
+              .hero-badges {{ display: flex; justify-content: center; flex-wrap: wrap; gap: 12px; margin-top: 30px; }}
+              .hero-badge {{ display: inline-flex; align-items: center; gap: 9px; padding: 12px 18px; border-radius: 999px; background: rgba(255,255,255,.70); border: 1px solid var(--line); font-size: 18px; font-weight: 850; }}
+              .dot {{ width: 14px; height: 14px; border-radius: 50%; background: #d9a928; box-shadow: 0 0 0 8px rgba(217,169,40,.14); }}
+              .section-title {{ font-size: clamp(40px, 7vw, 66px); line-height: .95; letter-spacing: -.08em; margin: 0 0 22px; }}
+              .tabs {{ display: flex; flex-wrap: wrap; gap: 14px; margin-bottom: 20px; }}
+              .tab {{ border: 1px solid var(--line-strong); background: rgba(255,255,255,.62); color: var(--blue); padding: 15px 25px; border-radius: 999px; font-size: 21px; font-weight: 900; box-shadow: 0 5px 18px rgba(0,0,0,.04); }}
+              .tab.active {{ background: var(--black); color: var(--bg2); border-color: var(--black); }}
+              .search {{ position: relative; margin: 18px 0 26px; }}
+              .search input {{ width: 100%; border: 1px solid var(--line); border-radius: 32px; background: rgba(255,255,255,.64); color: var(--text); padding: 22px 24px 22px 56px; font-size: 20px; outline: none; box-shadow: inset 0 1px 0 rgba(255,255,255,.7); }}
+              .search span {{ position: absolute; left: 24px; top: 50%; transform: translateY(-50%); opacity: .65; font-size: 18px; }}
+              .count {{ color: var(--muted); font-size: 22px; font-weight: 850; margin: 0 0 24px; }}
+              .grid {{ display: grid; gap: 22px; }}
+              .card {{ border: 1px solid var(--line); border-radius: 32px; background: var(--card); backdrop-filter: blur(18px); box-shadow: var(--shadow); padding: 28px; }}
+              .card-head {{ display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 24px; }}
+              .file-icon {{ width: 56px; height: 56px; border-radius: 20px; display: grid; place-items: center; border: 1px solid var(--line-strong); background: rgba(255,255,255,.62); font-weight: 950; font-size: 20px; }}
+              .calendar-icon {{ background: linear-gradient(135deg, rgba(22,119,255,.16), rgba(217,169,40,.20)); color: var(--blue); }}
+              .type-pill {{ padding: 10px 17px; border-radius: 999px; background: rgba(240, 236, 224, .72); color: var(--muted); font-weight: 900; font-size: 18px; }}
+              h3 {{ margin: 0; font-size: clamp(28px, 4.5vw, 42px); line-height: 1.1; letter-spacing: -.05em; }}
+              .path, .updated, .cal-desc, .cal-meta {{ color: var(--muted); font-weight: 760; font-size: 20px; line-height: 1.65; }}
+              .path {{ margin: 14px 0 6px; }}
+              .updated {{ margin: 0 0 22px; }}
+              .actions {{ display: flex; flex-wrap: wrap; gap: 12px; margin-top: 10px; }}
+              .action {{ appearance: none; border: 1px solid var(--line-strong); background: rgba(255,255,255,.64); color: var(--blue); text-decoration: none; padding: 12px 18px; border-radius: 999px; font-size: 18px; font-weight: 920; cursor: pointer; }}
+              .primary-dark {{ background: var(--black); color: var(--bg2); border-color: var(--black); }}
+              .primary-blue {{ background: var(--blue); color: #fff; border-color: var(--blue); }}
+              .calendar-card {{ padding: clamp(28px, 5vw, 44px); }}
+              .calendar-card h3 {{ max-width: 760px; }}
+              .cal-desc {{ max-width: 760px; margin: 18px 0 22px; }}
+              .cal-chips {{ display: flex; flex-wrap: wrap; gap: 12px; margin: 8px 0 28px; }}
+              .cal-chip {{ border: 1px solid var(--line-strong); background: rgba(255,255,255,.58); border-radius: 999px; padding: 10px 16px; font-size: 19px; font-weight: 850; }}
+              .cal-chip b {{ font-weight: 950; }}
+              .holiday {{ color: #d92d20; }} .workday {{ color: #b54708; }} .traditional {{ color: #1570ef; }} .solar {{ color: #027a48; }} .memorial {{ color: #6941c6; }}
+              .empty {{ display: none; text-align: center; color: var(--muted); font-weight: 850; padding: 30px; }}
+              .toast {{ position: fixed; left: 50%; bottom: 26px; transform: translateX(-50%) translateY(20px); opacity: 0; pointer-events: none; padding: 12px 18px; border-radius: 999px; background: var(--black); color: var(--bg2); font-weight: 900; transition: .2s ease; }}
+              .toast.show {{ opacity: 1; transform: translateX(-50%) translateY(0); }}
+              footer {{ margin-top: 36px; color: var(--muted); text-align: center; font-weight: 700; }}
+              @media (max-width: 640px) {{
+                .wrap {{ padding: 24px 14px 36px; }}
+                .brand b {{ font-size: 25px; }}
+                .repo-link {{ display: none; }}
+                .hero {{ border-radius: 32px; padding: 42px 14px; }}
+                .tab {{ font-size: 19px; padding: 14px 22px; }}
+                .card {{ border-radius: 28px; padding: 24px; }}
+                .action {{ font-size: 17px; }}
               }}
             </style>
           </head>
           <body>
-            <header class="shell nav">
-              <a class="brand" href="./"><span class="mark">PK</span><span>ProxyKit</span></a>
-              <a class="repo" href="https://github.com/{OWNER}/{REPO}" target="_blank" rel="noopener">查看仓库</a>
-            </header>
+            <main class="wrap">
+              <header class="topbar">
+                <a class="brand" href="./" aria-label="ProxyKit 首页"><span class="logo">PK</span><b>ProxyKit</b></a>
+                <a class="repo-link" href="https://github.com/{OWNER}/{REPO}">查看仓库</a>
+              </header>
 
-            <main>
-              <section class="shell hero">
-                <div class="hero-inner">
-                  <h1>ProxyKit</h1>
-                  <div class="caps">
-                    <span class="cap"><span class="dot"></span>适配：Surge</span>
-                    <span class="cap"><span class="dot"></span>更新：部分自动</span>
-                  </div>
+              <section class="hero">
+                <h1>ProxyKit</h1>
+                <div class="hero-badges">
+                  <span class="hero-badge"><i class="dot"></i>适配：Surge</span>
+                  <span class="hero-badge"><i class="dot"></i>更新：部分自动</span>
                 </div>
               </section>
 
-              <section class="shell section">
-                <h2 class="title">文件列表</h2>
+              <h2 class="section-title">文件列表</h2>
+              <nav class="tabs" aria-label="文件分类">
+                <button class="tab active" type="button" data-filter="all">全部</button>
+                <button class="tab" type="button" data-filter="Rule">规则</button>
+                <button class="tab" type="button" data-filter="Scripts">脚本</button>
+                <button class="tab" type="button" data-filter="SurgeModule">模块</button>
+                <button class="tab" type="button" data-filter="Calendar">日历</button>
+              </nav>
 
-                <div class="chips">
-                  <button class="chip active" data-filter="all">全部</button>
-                  <button class="chip" data-filter="Rule">规则</button>
-                  <button class="chip" data-filter="Scripts">脚本</button>
-                  <button class="chip" data-filter="SurgeModule">模块</button>
-                </div>
+              <label class="search"><span>⌕</span><input id="search" type="search" placeholder="筛选当前列表…" autocomplete="off"></label>
+              <p id="count" class="count">共 {total} 项</p>
 
-                <label class="search">
-                  <span>⌕</span>
-                  <input id="search" type="search" placeholder="筛选当前列表…" />
-                </label>
-
-                <p class="meta" id="meta">共 {total} 项</p>
-                <div class="grid" id="grid">{cards_html}</div>
-                <div class="empty" id="empty">没找到，换个关键词试试。</div>
+              <section id="grid" class="grid">{cards_html}
               </section>
+              <p id="empty" class="empty">没找到，换个关键词试试。</p>
+              <footer>ProxyKit · 代理配置集合 · 适用于 GitHub Pages · 自动索引页面</footer>
             </main>
-
-            <footer class="shell footer">ProxyKit · 代理配置集合</footer>
-
+            <div id="toast" class="toast">已复制</div>
+            <script id="files-json" type="application/json">{esc(categories_json)}</script>
             <script>
-              const cards = Array.from(document.querySelectorAll('.file-card'));
-              const chips = Array.from(document.querySelectorAll('.chip'));
-              const input = document.getElementById('search');
-              const meta = document.getElementById('meta');
-              const empty = document.getElementById('empty');
+              const tabs = Array.from(document.querySelectorAll('.tab'));
+              const cards = Array.from(document.querySelectorAll('.card'));
+              const input = document.querySelector('#search');
+              const count = document.querySelector('#count');
+              const empty = document.querySelector('#empty');
+              const toast = document.querySelector('#toast');
               let active = 'all';
 
-              function applyFilter() {{
-                const query = input.value.trim().toLowerCase();
-                let count = 0;
-
-                cards.forEach(card => {{
-                  const okFolder = active === 'all' || card.dataset.folder === active;
-                  const okSearch = !query || card.dataset.search.includes(query);
-                  const show = okFolder && okSearch;
-                  card.classList.toggle('hidden', !show);
-                  if (show) count++;
-                }});
-
-                meta.textContent = '共 ' + count + ' 项';
-                empty.style.display = count ? 'none' : 'block';
+              function visibleForTab(card) {{
+                const folder = card.dataset.folder;
+                if (active === 'all') return folder !== 'Calendar';
+                return folder === active;
               }}
 
-              chips.forEach(chip => {{
-                chip.addEventListener('click', () => {{
-                  active = chip.dataset.filter;
-                  chips.forEach(item => item.classList.toggle('active', item === chip));
-                  applyFilter();
+              function refresh() {{
+                const q = input.value.trim().toLowerCase();
+                let n = 0;
+                for (const card of cards) {{
+                  const hitTab = visibleForTab(card);
+                  const hitSearch = !q || (card.dataset.search || '').includes(q);
+                  const show = hitTab && hitSearch;
+                  card.style.display = show ? '' : 'none';
+                  if (show) n++;
+                }}
+                const label = active === 'Calendar' ? '个日历' : '项';
+                count.textContent = `共 ${{n}} ${{label}}`;
+                empty.style.display = n ? 'none' : 'block';
+              }}
+
+              tabs.forEach(btn => {{
+                btn.addEventListener('click', () => {{
+                  active = btn.dataset.filter;
+                  tabs.forEach(x => x.classList.toggle('active', x === btn));
+                  input.value = '';
+                  refresh();
                 }});
               }});
 
-              input.addEventListener('input', applyFilter);
+              input.addEventListener('input', refresh);
 
-              document.addEventListener('click', async event => {{
+              async function copyText(text) {{
+                try {{
+                  await navigator.clipboard.writeText(text);
+                }} catch (_) {{
+                  const ta = document.createElement('textarea');
+                  ta.value = text;
+                  document.body.appendChild(ta);
+                  ta.select();
+                  document.execCommand('copy');
+                  ta.remove();
+                }}
+                toast.classList.add('show');
+                setTimeout(() => toast.classList.remove('show'), 1300);
+              }}
+
+              document.addEventListener('click', event => {{
                 const btn = event.target.closest('[data-copy]');
                 if (!btn) return;
-
-                try {{
-                  await navigator.clipboard.writeText(btn.dataset.copy);
-                  btn.textContent = '已复制';
-                  setTimeout(() => btn.textContent = '复制', 1200);
-                }} catch {{
-                  btn.textContent = '复制失败';
-                  setTimeout(() => btn.textContent = '复制', 1200);
-                }}
+                copyText(btn.dataset.copy || '');
               }});
+
+              refresh();
             </script>
           </body>
-          </html>"""
+          </html>'''
 
           out = Path("/tmp/proxykit-pages")
           out.mkdir(parents=True, exist_ok=True)
           out.joinpath("index.html").write_text(index_html, encoding="utf-8")
           out.joinpath("files.json").write_text(json.dumps(grouped, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
           out.joinpath(".nojekyll").write_text("", encoding="utf-8")
-
-          print(f"Rendered {total} files into static HTML.")
+          print(f"Rendered {total} normal files plus calendar card.")
           PY
 
       - name: Publish to gh-pages branch
         run: |
           set -euo pipefail
-
           git checkout --orphan gh-pages
           git rm -rf . >/dev/null 2>&1 || true
           cp -a /tmp/proxykit-pages/. .
-
           git add -A
           git commit -m "deploy: render static GitHub Pages" || {
             echo "No changes to deploy"
             exit 0
           }
-
           git push --force origin gh-pages

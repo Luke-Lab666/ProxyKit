@@ -1,0 +1,48 @@
+name: Update Calendar
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - "Calendar/data/**"
+      - "Calendar/scripts/**"
+      - ".github/workflows/update-calendar.yml"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: update-calendar
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository without Node actions
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          git init .
+          git remote add origin "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          git fetch --prune --no-tags origin "+refs/heads/main:refs/remotes/origin/main"
+          git checkout -B main origin/main
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Build calendar files
+        run: python3 Calendar/scripts/build_calendar.py
+
+      - name: Commit changes
+        run: |
+          set -euo pipefail
+          git add Calendar/*.ics Calendar/README.md
+          if git diff --cached --quiet; then
+            echo "No calendar changes."
+          else
+            git commit -m "chore(calendar): update subscription calendars"
+            git push origin main
+          fi
