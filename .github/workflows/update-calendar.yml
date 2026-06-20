@@ -1,14 +1,15 @@
 name: Update Calendar
 
 on:
+  schedule:
+    # 每年 12 月 17 日 00:17 北京时间运行
+    - cron: "17 16 16 12 *"
   workflow_dispatch:
-  push:
-    branches:
-      - main
-    paths:
-      - "Calendar/calendar-data*.json"
-      - "Calendar/build_calendar.py"
-      - ".github/workflows/update-calendar.yml"
+    inputs:
+      year:
+        description: "要生成的年份，留空则自动判断"
+        required: false
+        type: string
 
 permissions:
   contents: write
@@ -18,8 +19,11 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  build:
+  update:
     runs-on: ubuntu-latest
+    env:
+      INPUT_YEAR: ${{ github.event.inputs.year || '' }}
+
     steps:
       - name: Checkout repository without Node actions
         env:
@@ -33,16 +37,667 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
-      - name: Build calendar files
-        run: python3 Calendar/build_calendar.py
-
-      - name: Commit changes
+      - name: Install calendar dependencies
         run: |
           set -euo pipefail
-          git add Calendar/*.ics Calendar/README.md
+          python3 -m pip install --upgrade pip
+          python3 -m pip install lunardate chinese-calendar
+
+      - name: Generate calendar files
+        run: |
+          set -euo pipefail
+          mkdir -p Calendar
+          python3 <<'PY'
+          import calendar
+          import hashlib
+          import html
+          import json
+          import math
+          import os
+          import re
+          import urllib.request
+          from datetime import date, datetime, timedelta, timezone
+          from pathlib import Path
+          from zoneinfo import ZoneInfo
+
+          from lunardate import LunarDate
+
+          try:
+              from chinese_calendar import get_holiday_detail, is_workday
+          except Exception:
+              get_holiday_detail = None
+              is_workday = None
+
+          START_YEAR = 2026
+          TZ = ZoneInfo("Asia/Shanghai")
+          CALENDAR_DIR = Path("Calendar")
+
+          REPO_OWNER = "Luke-Lab666"
+          REPO_NAME = "ProxyKit"
+          BRANCH = "main"
+          RAW_BASE = f"https://raw.githubusercontent.com/{REPO_OWNER}/{REPO_NAME}/{BRANCH}/"
+
+          LATEST_FILE = CALENDAR_DIR / "cn-mainland-latest.ics"
+          INDEX_FILE = CALENDAR_DIR / "calendar-index.json"
+
+          SOLAR_TERMS = [
+              ("小寒", 285),
+              ("大寒", 300),
+              ("立春", 315),
+              ("雨水", 330),
+              ("惊蛰", 345),
+              ("春分", 360),
+              ("清明", 375),
+              ("谷雨", 390),
+              ("立夏", 405),
+              ("小满", 420),
+              ("芒种", 435),
+              ("夏至", 450),
+              ("小暑", 465),
+              ("大暑", 480),
+              ("立秋", 495),
+              ("处暑", 510),
+              ("白露", 525),
+              ("秋分", 540),
+              ("寒露", 555),
+              ("霜降", 570),
+              ("立冬", 585),
+              ("小雪", 600),
+              ("大雪", 615),
+              ("冬至", 630),
+          ]
+
+          LUNAR_FESTIVALS = [
+              ("春节", 1, 1),
+              ("元宵节", 1, 15),
+              ("龙抬头", 2, 2),
+              ("上巳节", 3, 3),
+              ("端午节", 5, 5),
+              ("七夕", 7, 7),
+              ("中元节", 7, 15),
+              ("中秋节", 8, 15),
+              ("重阳节", 9, 9),
+              ("寒衣节", 10, 1),
+              ("下元节", 10, 15),
+              ("腊八节", 12, 8),
+              ("小年", 12, 23),
+          ]
+
+          SOLAR_MEMORIALS = [
+              ("中国人民警察节", 1, 10),
+              ("中国植树节", 3, 12),
+              ("中国航天日", 4, 24),
+              ("五四青年节", 5, 4),
+              ("全国防灾减灾日", 5, 12),
+              ("儿童节", 6, 1),
+              ("中国共产党成立纪念日", 7, 1),
+              ("中国人民抗日战争胜利纪念日", 9, 3),
+              ("中国烈士纪念日", 9, 30),
+              ("记者节", 11, 8),
+              ("全国消防日", 11, 9),
+              ("国家宪法日", 12, 4),
+              ("南京大屠杀死难者国家公祭日", 12, 13),
+          ]
+
+          # 兜底：如果 chinese-calendar 还没更新到某年，至少 2026 年可直接按国务院通知生成。
+          # 事件标题不加“节假日/调休/传统节日/纪念日/节气”等前缀。
+          EMBEDDED_HOLIDAY_PLAN = {
+              2026: {
+                  "holidays": [
+                      ("元旦", "2026-01-01", "2026-01-03"),
+                      ("春节", "2026-02-15", "2026-02-23"),
+                      ("清明节", "2026-04-04", "2026-04-06"),
+                      ("劳动节", "2026-05-01", "2026-05-05"),
+                      ("端午节", "2026-06-19", "2026-06-21"),
+                      ("中秋节", "2026-09-25", "2026-09-27"),
+                      ("国庆节", "2026-10-01", "2026-10-07"),
+                  ],
+                  "workdays": [
+                      "2026-01-04",
+                      "2026-02-14",
+                      "2026-02-28",
+                      "2026-05-09",
+                      "2026-09-20",
+                      "2026-10-10",
+                  ],
+                  "source": "国务院办公厅关于2026年部分节假日安排的通知",
+              }
+          }
+
+          def parse_target_year():
+              raw = os.environ.get("INPUT_YEAR", "").strip()
+              if raw:
+                  year = int(raw)
+              else:
+                  now = datetime.now(TZ).date()
+                  if now.month == 12 and now.day >= 17:
+                      year = now.year + 1
+                  else:
+                      year = now.year
+
+              if year < START_YEAR:
+                  year = START_YEAR
+              return year
+
+          def date_range(start, end):
+              current = date.fromisoformat(start)
+              stop = date.fromisoformat(end)
+              while current <= stop:
+                  yield current
+                  current += timedelta(days=1)
+
+          def event_uid(name, day, kind):
+              raw = f"{name}|{day.isoformat()}|{kind}"
+              digest = hashlib.sha1(raw.encode("utf-8")).hexdigest()[:16]
+              return f"{digest}@proxykit.calendar"
+
+          def ics_escape(value):
+              value = str(value)
+              value = value.replace("\\", "\\\\")
+              value = value.replace(";", "\\;")
+              value = value.replace(",", "\\,")
+              value = value.replace("\n", "\\n")
+              return value
+
+          def fold_ics_line(line):
+              encoded = line.encode("utf-8")
+              if len(encoded) <= 75:
+                  return line
+
+              out = []
+              current = ""
+              current_len = 0
+
+              for ch in line:
+                  size = len(ch.encode("utf-8"))
+                  if current_len + size > 75:
+                      out.append(current)
+                      current = " " + ch
+                      current_len = 1 + size
+                  else:
+                      current += ch
+                      current_len += size
+
+              if current:
+                  out.append(current)
+
+              return "\r\n".join(out)
+
+          def add_event(events, summary, day, kind, description="", priority=50):
+              if not isinstance(day, date):
+                  raise TypeError("day must be date")
+
+              if day.year < START_YEAR:
+                  return
+
+              key = (day.isoformat(), summary, kind)
+              events[key] = {
+                  "summary": summary,
+                  "date": day,
+                  "kind": kind,
+                  "description": description,
+                  "priority": priority,
+              }
+
+          def build_holiday_events(year, events):
+              found = False
+
+              if get_holiday_detail and is_workday:
+                  start = date(year, 1, 1)
+                  end = date(year, 12, 31)
+                  current = start
+
+                  while current <= end:
+                      try:
+                          is_holiday_flag, holiday_name = get_holiday_detail(current)
+                      except Exception:
+                          is_holiday_flag, holiday_name = False, None
+
+                      if holiday_name:
+                          found = True
+                          add_event(
+                              events,
+                              str(holiday_name),
+                              current,
+                              "official_holiday",
+                              "类型：法定节假日。数据源：chinese-calendar，通常依据国务院办公厅节假日安排维护。",
+                              10,
+                          )
+
+                      try:
+                          workday_flag = is_workday(current)
+                      except Exception:
+                          workday_flag = False
+
+                      if workday_flag and current.weekday() >= 5:
+                          found = True
+                          add_event(
+                              events,
+                              "调休上班",
+                              current,
+                              "adjusted_workday",
+                              "类型：调休上班日。数据源：chinese-calendar，通常依据国务院办公厅节假日安排维护。",
+                              11,
+                          )
+
+                      current += timedelta(days=1)
+
+              if found:
+                  return
+
+              plan = EMBEDDED_HOLIDAY_PLAN.get(year)
+              if not plan:
+                  return
+
+              for name, start, end in plan["holidays"]:
+                  for day in date_range(start, end):
+                      add_event(
+                          events,
+                          name,
+                          day,
+                          "official_holiday",
+                          f"类型：法定节假日。数据源：{plan['source']}。",
+                          10,
+                      )
+
+              for raw_day in plan["workdays"]:
+                  day = date.fromisoformat(raw_day)
+                  add_event(
+                      events,
+                      "调休上班",
+                      day,
+                      "adjusted_workday",
+                      f"类型：调休上班日。数据源：{plan['source']}。",
+                      11,
+                  )
+
+          def build_lunar_events(year, events):
+              for lunar_year in (year - 1, year, year + 1):
+                  for name, month, day in LUNAR_FESTIVALS:
+                      try:
+                          solar_day = LunarDate(lunar_year, month, day).toSolarDate()
+                      except Exception:
+                          continue
+
+                      if solar_day.year == year:
+                          add_event(
+                              events,
+                              name,
+                              solar_day,
+                              "traditional",
+                              "类型：中国传统节日。",
+                              30,
+                          )
+
+                  try:
+                      next_spring = LunarDate(lunar_year + 1, 1, 1).toSolarDate()
+                      eve = next_spring - timedelta(days=1)
+                      if eve.year == year:
+                          add_event(
+                              events,
+                              "除夕",
+                              eve,
+                              "traditional",
+                              "类型：中国传统节日。",
+                              30,
+                          )
+                  except Exception:
+                      pass
+
+          def build_solar_memorial_events(year, events):
+              for name, month, day in SOLAR_MEMORIALS:
+                  try:
+                      solar_day = date(year, month, day)
+                  except ValueError:
+                      continue
+
+                  add_event(
+                      events,
+                      name,
+                      solar_day,
+                      "memorial",
+                      "类型：中国常用纪念日。",
+                      40,
+                  )
+
+          def parse_dt_value(value, year):
+              value = str(value).strip()
+              value = value.replace("年", "-").replace("月", "-").replace("日", "")
+              value = value.replace("/", "-")
+              value = re.sub(r"\s+", " ", value)
+
+              patterns = [
+                  r"^(?P<y>\d{4})-(?P<m>\d{1,2})-(?P<d>\d{1,2}) (?P<h>\d{1,2}):(?P<min>\d{2})$",
+                  r"^(?P<m>\d{1,2})-(?P<d>\d{1,2}) (?P<h>\d{1,2}):(?P<min>\d{2})$",
+                  r"^(?P<m>\d{1,2}) (?P<d>\d{1,2}) (?P<h>\d{1,2}):(?P<min>\d{2})$",
+              ]
+
+              for pattern in patterns:
+                  match = re.match(pattern, value)
+                  if not match:
+                      continue
+
+                  y = int(match.groupdict().get("y") or year)
+                  m = int(match.group("m"))
+                  d = int(match.group("d"))
+                  h = int(match.group("h"))
+                  minute = int(match.group("min"))
+                  return datetime(y, m, d, h, minute, tzinfo=TZ)
+
+              raise ValueError(f"Unsupported datetime format: {value}")
+
+          def load_pmo_solar_terms(year):
+              # 主源入口：手动或后续脚本写入的紫金山天文台数据。
+              # 文件格式：
+              # {
+              #   "2026": {
+              #     "小寒": "2026-01-05 16:23",
+              #     "大寒": "2026-01-20 09:45"
+              #   }
+              # }
+              path = CALENDAR_DIR / "solar-terms-pmo.json"
+              if not path.exists():
+                  return None
+
+              try:
+                  data = json.loads(path.read_text(encoding="utf-8"))
+                  year_data = data.get(str(year))
+                  if not year_data:
+                      return None
+
+                  result = {}
+                  for name, _angle in SOLAR_TERMS:
+                      raw = year_data.get(name)
+                      if not raw:
+                          return None
+                      result[name] = parse_dt_value(raw, year)
+
+                  return result
+              except Exception:
+                  return None
+
+          def fetch_hko_solar_terms(year):
+              url = "https://www.hko.gov.hk/sc/gts/astronomy/Solar_Term.htm"
+
+              try:
+                  req = urllib.request.Request(
+                      url,
+                      headers={
+                          "User-Agent": "Mozilla/5.0 ProxyKit Calendar Generator",
+                          "Accept-Language": "zh-CN,zh;q=0.9",
+                      },
+                  )
+                  with urllib.request.urlopen(req, timeout=25) as response:
+                      text = response.read().decode("utf-8", errors="ignore")
+              except Exception:
+                  return None
+
+              plain = re.sub(r"<[^>]+>", " ", text)
+              plain = html.unescape(plain)
+              plain = re.sub(r"\s+", " ", plain)
+
+              year_match = re.search(
+                  rf"{year}\s*年(?P<body>.*?)(?=(?:20\d{{2}}\s*年)|注\s*意|注意|$)",
+                  plain,
+              )
+
+              if not year_match:
+                  return None
+
+              body = year_match.group("body")
+              result = {}
+
+              for name, _angle in SOLAR_TERMS:
+                  pattern = rf"{name}\s*(\d{{1,2}})\s*月\s*(\d{{1,2}})\s*日\s*(\d{{1,2}}):(\d{{2}})"
+                  match = re.search(pattern, body)
+                  if not match:
+                      return None
+
+                  month = int(match.group(1))
+                  day = int(match.group(2))
+                  hour = int(match.group(3))
+                  minute = int(match.group(4))
+                  result[name] = datetime(year, month, day, hour, minute, tzinfo=TZ)
+
+              return result
+
+          def julian_day(dt_utc):
+              timestamp = dt_utc.timestamp()
+              return 2440587.5 + timestamp / 86400.0
+
+          def from_julian_day(jd):
+              timestamp = (jd - 2440587.5) * 86400.0
+              return datetime.fromtimestamp(timestamp, tz=timezone.utc)
+
+          def normalize_angle(angle):
+              return angle % 360.0
+
+          def sun_apparent_longitude(jd):
+              t = (jd - 2451545.0) / 36525.0
+
+              l0 = 280.46646 + 36000.76983 * t + 0.0003032 * t * t
+              l0 = normalize_angle(l0)
+
+              m = 357.52911 + 35999.05029 * t - 0.0001537 * t * t
+              m_rad = math.radians(normalize_angle(m))
+
+              c = (
+                  (1.914602 - 0.004817 * t - 0.000014 * t * t) * math.sin(m_rad)
+                  + (0.019993 - 0.000101 * t) * math.sin(2 * m_rad)
+                  + 0.000289 * math.sin(3 * m_rad)
+              )
+
+              true_long = l0 + c
+              omega = 125.04 - 1934.136 * t
+              apparent = true_long - 0.00569 - 0.00478 * math.sin(math.radians(omega))
+              return normalize_angle(apparent)
+
+          def sun_longitude_unwrapped(jd):
+              value = sun_apparent_longitude(jd)
+              if value < 280:
+                  value += 360
+              return value
+
+          def local_algorithm_solar_terms(year):
+              start = datetime(year, 1, 1, 0, 0, tzinfo=timezone.utc)
+              end = datetime(year, 12, 29, 12, 0, tzinfo=timezone.utc)
+              low_base = julian_day(start)
+              high_base = julian_day(end)
+
+              result = {}
+
+              for name, target in SOLAR_TERMS:
+                  low = low_base
+                  high = high_base
+
+                  for _ in range(80):
+                      mid = (low + high) / 2
+                      value = sun_longitude_unwrapped(mid)
+
+                      if value < target:
+                          low = mid
+                      else:
+                          high = mid
+
+                  utc_dt = from_julian_day((low + high) / 2)
+                  sh_dt = utc_dt.astimezone(TZ)
+                  sh_dt = sh_dt.replace(second=0, microsecond=0)
+                  result[name] = sh_dt
+
+              return result
+
+          def load_solar_terms(year):
+              pmo = load_pmo_solar_terms(year)
+              if pmo:
+                  return pmo, "中国科学院紫金山天文台 / 中国天文年历", ""
+
+              hko = fetch_hko_solar_terms(year)
+              if hko:
+                  note = "紫金山天文台数据：暂未抓取到；当前采用香港天文台备源。"
+                  return hko, "香港天文台", note
+
+              local = local_algorithm_solar_terms(year)
+              note = "紫金山天文台数据：暂未抓取到；香港天文台数据：暂未抓取到；当前采用本地天文算法兜底。"
+              return local, "本地天文算法", note
+
+          def build_solar_term_events(year, events):
+              terms, source, note = load_solar_terms(year)
+
+              for name, _angle in SOLAR_TERMS:
+                  dt = terms.get(name)
+                  if not dt:
+                      continue
+
+                  desc = f"类型：二十四节气。交接时间：{dt.strftime('%H:%M')}，北京时间。数据源：{source}。"
+                  if note:
+                      desc += f" {note}"
+
+                  add_event(
+                      events,
+                      name,
+                      dt.date(),
+                      "solar_term",
+                      desc,
+                      20,
+                  )
+
+          def build_year_events(year):
+              events = {}
+
+              build_holiday_events(year, events)
+              build_lunar_events(year, events)
+              build_solar_memorial_events(year, events)
+              build_solar_term_events(year, events)
+
+              return sorted(
+                  events.values(),
+                  key=lambda item: (
+                      item["date"],
+                      item["priority"],
+                      item["summary"],
+                      item["kind"],
+                  ),
+              )
+
+          def render_ics(events, calendar_name):
+              now = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+
+              lines = [
+                  "BEGIN:VCALENDAR",
+                  "VERSION:2.0",
+                  "PRODID:-//Luke-Lab666//ProxyKit Calendar//CN",
+                  "CALSCALE:GREGORIAN",
+                  "METHOD:PUBLISH",
+                  f"X-WR-CALNAME:{ics_escape(calendar_name)}",
+                  "X-WR-TIMEZONE:Asia/Shanghai",
+                  "REFRESH-INTERVAL;VALUE=DURATION:P1D",
+                  "X-PUBLISHED-TTL:PT24H",
+              ]
+
+              for event in events:
+                  day = event["date"]
+                  end_day = day + timedelta(days=1)
+
+                  lines.extend([
+                      "BEGIN:VEVENT",
+                      f"UID:{event_uid(event['summary'], day, event['kind'])}",
+                      f"DTSTAMP:{now}",
+                      f"DTSTART;VALUE=DATE:{day.strftime('%Y%m%d')}",
+                      f"DTEND;VALUE=DATE:{end_day.strftime('%Y%m%d')}",
+                      f"SUMMARY:{ics_escape(event['summary'])}",
+                      f"DESCRIPTION:{ics_escape(event['description'])}",
+                      "TRANSP:TRANSPARENT",
+                      "END:VEVENT",
+                  ])
+
+              lines.append("END:VCALENDAR")
+              return "\r\n".join(fold_ics_line(line) for line in lines) + "\r\n"
+
+          def raw_url(path):
+              return RAW_BASE + "/".join(urllib.request.pathname2url(part) for part in path.as_posix().split("/"))
+
+          def webcal_url(path):
+              return raw_url(path).replace("https://", "webcal://", 1)
+
+          def file_size(path):
+              try:
+                  return path.stat().st_size
+              except Exception:
+                  return 0
+
+          target_year = parse_target_year()
+          yearly_file = CALENDAR_DIR / f"cn-mainland-{target_year}.ics"
+
+          rolling_years = list(range(max(START_YEAR, target_year - 1), target_year + 1))
+
+          for old_file in CALENDAR_DIR.glob("cn-mainland-*.ics"):
+              old_file.unlink()
+
+          year_index = []
+
+          for year in range(START_YEAR, target_year + 1):
+              events = build_year_events(year)
+              path = CALENDAR_DIR / f"cn-mainland-{year}.ics"
+              path.write_text(render_ics(events, f"中国大陆节假日与中国纪念日 {year}"), encoding="utf-8")
+
+              year_index.append({
+                  "year": year,
+                  "title": f"{year} 年数据",
+                  "name": f"中国大陆节假日与中国纪念日 {year}",
+                  "path": path.as_posix(),
+                  "raw": raw_url(path),
+                  "webcal": webcal_url(path),
+                  "count": len(events),
+                  "size": file_size(path),
+              })
+
+          latest_events = []
+          for year in rolling_years:
+              latest_events.extend(build_year_events(year))
+
+          LATEST_FILE.write_text(
+              render_ics(
+                  latest_events,
+                  f"中国大陆节假日与中国纪念日 最新订阅 {rolling_years[0]}-{rolling_years[-1]}",
+              ),
+              encoding="utf-8",
+          )
+
+          index = {
+              "version": 1,
+              "startYear": START_YEAR,
+              "targetYear": target_year,
+              "updatedAt": datetime.now(TZ).isoformat(timespec="seconds"),
+              "latest": {
+                  "title": "永久更新订阅",
+                  "name": f"中国大陆节假日与中国纪念日 最新订阅 {rolling_years[0]}-{rolling_years[-1]}",
+                  "path": LATEST_FILE.as_posix(),
+                  "raw": raw_url(LATEST_FILE),
+                  "webcal": webcal_url(LATEST_FILE),
+                  "years": rolling_years,
+                  "count": len(latest_events),
+                  "size": file_size(LATEST_FILE),
+              },
+              "years": year_index,
+          }
+
+          INDEX_FILE.write_text(json.dumps(index, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+
+          print(f"Generated calendar target year: {target_year}")
+          print(f"Generated latest rolling years: {rolling_years[0]}-{rolling_years[-1]}")
+          print(f"Generated files: {LATEST_FILE.as_posix()}, {yearly_file.as_posix()}, {INDEX_FILE.as_posix()}")
+          PY
+
+      - name: Commit calendar update
+        run: |
+          set -euo pipefail
+
+          git add Calendar
+
           if git diff --cached --quiet; then
-            echo "No calendar changes."
-          else
-            git commit -m "chore(calendar): update subscription calendar"
-            git push origin main
+            echo "No calendar changes"
+            exit 0
           fi
+
+          git commit -m "calendar: update mainland calendar"
+          git push origin main
