@@ -200,7 +200,7 @@ jobs:
                 </p>
 
                 <div class="actions">
-                  <a class="action" href="{esc(file["raw"])}">原始链接</a>
+                  <a class="action" href="{esc(file["raw"])}">RAW链接</a>
                   <a class="action" href="{esc(file["github"])}">仓库页</a>
                   {install}
                   <button class="action copy-btn" type="button" data-copy="{esc(file["raw"])}">复制</button>
