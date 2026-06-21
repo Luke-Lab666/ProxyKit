@@ -1,11 +1,24 @@
-#!name=番茄小说 + 红果短剧去广告 NoMITM Aggressive
-#!desc=无 MITM 激进版：拦截番茄小说、红果短剧、字节系广告/日志/福利/金币/任务/穿山甲/Pangle/ByteGecko 相关域名。不能改响应体，只能域名级硬拦。
+#!name=番茄小说 + 红果短剧去广告 NoMITM Safe
+#!desc=无 MITM 安全版：保留番茄小说、红果短剧常见广告/日志/金币/任务拦截；放行抖音直播 Webcast / Webcast Sign / Webcast ByteGecko，避免抖音直播打不开。
 #!author=Luke-Lab666
 #!category=Luke-Lab666
 #!tag=去广告
-#!date=2026-06-19
+#!date=2026-06-21
 
 [Rule]
+
+# ================================
+# 抖音直播救命白名单
+# 必须放在所有 REJECT 前面
+# ================================
+DOMAIN,webcast.amemv.com,DIRECT
+DOMAIN,webcast5-normal-hl.amemv.com,DIRECT
+DOMAIN,webcast5-normal-lq.amemv.com,DIRECT
+DOMAIN,webcast-open.douyin.com,DIRECT
+DOMAIN,p3-webcast-sign.douyinpic.com,DIRECT
+DOMAIN,p11-webcast-sign.douyinpic.com,DIRECT
+DOMAIN,lf-webcast-gr-sourcecdn.bytegecko.com,DIRECT
+
 # ================================
 # Pangle / 穿山甲广告核心
 # ================================
@@ -15,7 +28,6 @@ DOMAIN,api-access.pangolin-sdk-toutiao.com,REJECT-DROP
 DOMAIN,api-access.pangolin-sdk-toutiao-b.com,REJECT-DROP
 DOMAIN,api-access.pangolin-sdk-toutiao1.com,REJECT-DROP
 DOMAIN,api-access.pangolin-sdk-toutiao2.com,REJECT-DROP
-
 DOMAIN-SUFFIX,pangolin-sdk-toutiao.com,REJECT-DROP
 DOMAIN-SUFFIX,pangolin-sdk-toutiao-b.com,REJECT-DROP
 DOMAIN-SUFFIX,pangolin-sdk-toutiao1.com,REJECT-DROP
@@ -29,7 +41,6 @@ DOMAIN,ad.zijieapi.com,REJECT-DROP
 DOMAIN,ad-cn.snssdk.com,REJECT-DROP
 DOMAIN,ad.toutiao.com,REJECT-DROP
 DOMAIN,dm.toutiao.com,REJECT-DROP
-
 DOMAIN,ads3-normal.zijieapi.com,REJECT-DROP
 DOMAIN,ads5-normal.zijieapi.com,REJECT-DROP
 DOMAIN,ads3-normal-lf.zijieapi.com,REJECT-DROP
@@ -38,7 +49,6 @@ DOMAIN,ads3-normal-hl.zijieapi.com,REJECT-DROP
 DOMAIN,ads5-normal-hl.zijieapi.com,REJECT-DROP
 DOMAIN,ads3-normal-lq.zijieapi.com,REJECT-DROP
 DOMAIN,ads5-normal-lq.zijieapi.com,REJECT-DROP
-
 DOMAIN,adshare.toutiao.com,REJECT-DROP
 DOMAIN,adshare.toutiaocloud.com,REJECT-DROP
 DOMAIN,ads.tiktok.com,REJECT-DROP
@@ -67,7 +77,6 @@ DOMAIN,log3-normal-lq.snssdk.com,REJECT-DROP
 DOMAIN,log5-normal-lf.snssdk.com,REJECT-DROP
 DOMAIN,log5-normal-hl.snssdk.com,REJECT-DROP
 DOMAIN,log5-normal-lq.snssdk.com,REJECT-DROP
-
 DOMAIN,mon.zijieapi.com,REJECT-DROP
 DOMAIN,timon.zijieapi.com,REJECT-DROP
 DOMAIN,abtest3-misc.zijieapi.com,REJECT-DROP
@@ -75,7 +84,6 @@ DOMAIN,abtest5-misc.zijieapi.com,REJECT-DROP
 DOMAIN,feedback-c.zijieapi.com,REJECT-DROP
 DOMAIN,ma.zijieapi.com,REJECT-DROP
 DOMAIN,vcs.zijieapi.com,REJECT-DROP
-
 DOMAIN-SUFFIX,applog.snssdk.com,REJECT-DROP
 DOMAIN-SUFFIX,mon.snssdk.com,REJECT-DROP
 DOMAIN-SUFFIX,mon.toutiaocloud.com,REJECT-DROP
@@ -83,7 +91,8 @@ DOMAIN-SUFFIX,mon.toutiaocloud.net,REJECT-DROP
 
 # ================================
 # 风控 / SDK
-# 激进项：可能影响登录、播放、签到、任务
+# 这几个很激进，保留会更干净，但可能影响登录、播放、签到、任务
+# 抖音直播打不开优先排查时，可以先注释掉这一段
 # ================================
 DOMAIN,mssdk.snssdk.com,REJECT-DROP
 DOMAIN,mssdk.zijieapi.com,REJECT-DROP
@@ -95,16 +104,14 @@ DOMAIN,is-lq.snssdk.com,REJECT-DROP
 
 # ================================
 # ByteGecko 动态组件 / 广告资源包 / 活动组件
+# 不再拦 DOMAIN-SUFFIX,bytegecko.com
+# 否则抖音直播、活动页、动态组件都容易炸
 # ================================
 DOMAIN,gecko3.zijieapi.com,REJECT-DROP
 DOMAIN,gecko5.zijieapi.com,REJECT-DROP
 DOMAIN,lf-normal-gr-sourcecdn.bytegecko.com,REJECT-DROP
-DOMAIN,lf-webcast-gr-sourcecdn.bytegecko.com,REJECT-DROP
 DOMAIN,lf-sourcecdn-tos.bytegecko.com,REJECT-DROP
 DOMAIN,lf-sourcecdn-tos.bytegecko.snssdk.com,REJECT-DROP
-
-DOMAIN-SUFFIX,bytegecko.com,REJECT-DROP
-DOMAIN-SUFFIX,bytegecko.snssdk.com,REJECT-DROP
 
 # ================================
 # 福利 / 金币 / 任务 / 钱包 / 小游戏
@@ -123,14 +130,9 @@ DOMAIN,polaris5-normal-hl.zijieapi.com,REJECT-DROP
 
 # ================================
 # 红果短剧 / 抖音短剧广告与活动组件
+# 已移除 Webcast 直播链路拦截
 # ================================
 DOMAIN,p3-developer.bytemaimg.com,REJECT-DROP
-DOMAIN,p3-webcast-sign.douyinpic.com,REJECT-DROP
-DOMAIN,p11-webcast-sign.douyinpic.com,REJECT-DROP
-DOMAIN,webcast-open.douyin.com,REJECT-DROP
-DOMAIN,webcast.amemv.com,REJECT-DROP
-DOMAIN,webcast5-normal-hl.amemv.com,REJECT-DROP
-DOMAIN,webcast5-normal-lq.amemv.com,REJECT-DROP
 
 # ================================
 # 推广 / 活动 / 资源兜底
