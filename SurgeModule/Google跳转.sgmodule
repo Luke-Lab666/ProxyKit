@@ -13,9 +13,12 @@
 # 搜索结果跳转链接：google.cn/url -> google.com/url
 ^https?:\/\/(?:www\.)?google\.cn\/url\?(.+)$ https://www.google.com/url?$1 302
 
-# google.cn 首页 / webhp -> google.com
-^https?:\/\/(?:www\.)?google\.cn\/$ https://www.google.com/ 302
-^https?:\/\/(?:www\.)?google\.cn\/webhp.*$ https://www.google.com/ 302
+# google.cn 首页 / webhp -> google.com/ncr
+
+^https?:\/\/(?:www\.)?google\.cn\/$ https://www.google.com/ncr 302
+
+^https?:\/\/(?:www\.)?google\.cn\/webhp.*$ https://www.google.com/ncr 302
 
 [MITM]
+
 hostname = %APPEND% google.cn, www.google.cn
