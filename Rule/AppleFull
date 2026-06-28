@@ -1,7 +1,7 @@
 # NAME: AppleFull
 # AUTHOR: Luke-Lab666
 # REPO: https://github.com/Luke-Lab666/ProxyKit
-# UPDATED: 2026-06-27 22:16:30 UTC
+# UPDATED: 2026-06-28 22:15:38 UTC
 # DESC: Full Apple related domain and IP rules for Surge.
 # FORMAT: Surge Rule Set
 # SOURCE:
@@ -111,6 +111,7 @@ DOMAIN-SUFFIX,guzzoni.smoot.apple.com
 DOMAIN-SUFFIX,iadsdk.apple.com
 DOMAIN-SUFFIX,icloud-apple.cn
 DOMAIN-SUFFIX,icloud-content.com
+DOMAIN-SUFFIX,icloud-content.com.cn
 DOMAIN-SUFFIX,icloud-isupport.com
 DOMAIN-SUFFIX,icloud-sandbox.com
 DOMAIN-SUFFIX,icloud.apple.com
