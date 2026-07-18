@@ -1,7 +1,7 @@
 # NAME: AGI
 # AUTHOR: Luke-Lab666
 # REPO: https://github.com/Luke-Lab666/ProxyKit
-# UPDATED: 2026-07-17 21:12:08 UTC
+# UPDATED: 2026-07-18 21:10:30 UTC
 # DESC: Non-mainland China AI / AGI related domains for Surge.
 # INCLUDE: OpenAI, Copilot, GitHub Copilot, GitHub Models, Gemini, Google Antigravity, Anthropic, JetBrains AI, Meta AI, Perplexity, Mistral AI, Grok AI, Trae AI, OpenRouter, TokenFlux, Groq, Together, Fireworks, Hyperbolic, Jina AI, GPUStack, VoyageAI, Vertex AI, Poe, Cerebras AI, Vercel AI, Hugging Face AI, NVIDIA AI, Kiro, MiniMax International, Z.ai, Xiaomi MiMo.
 # FORMAT: DOMAIN / DOMAIN-SUFFIX
@@ -14,6 +14,8 @@ DOMAIN,aida.googleapis.com
 DOMAIN,aisandbox-pa.googleapis.com
 DOMAIN,alkalicore-pa.clients6.google.com
 DOMAIN,alkalimakersuite-pa.clients6.google.com
+DOMAIN,anthropic-com.ghost.io
+DOMAIN,anthropic.com.cdn.cloudflare.net
 DOMAIN,antigravity-unleash.goog
 DOMAIN,api.github.com
 DOMAIN,api.nvcf.nvidia.com
@@ -41,6 +43,7 @@ DOMAIN,openaicom-api-bdcpf8c6d2e9atf6.z01.azurefd.net
 DOMAIN,openaicomproductionae4b.blob.core.windows.net
 DOMAIN,production-openaicom-storage.azureedge.net
 DOMAIN,robinfrontend-pa.googleapis.com
+DOMAIN,servd-anthropic-website.b-cdn.net
 DOMAIN,sydney.bing.com
 DOMAIN,vertexai.googleapis.com
 DOMAIN-SUFFIX,ai-sdk.dev
@@ -61,6 +64,8 @@ DOMAIN-SUFFIX,ciciai.com
 DOMAIN-SUFFIX,clau.de
 DOMAIN-SUFFIX,claude.ai
 DOMAIN-SUFFIX,claude.com
+DOMAIN-SUFFIX,claudemcpclient.com
+DOMAIN-SUFFIX,claudemcpcontent.com
 DOMAIN-SUFFIX,claudeusercontent.com
 DOMAIN-SUFFIX,clipdrop.co
 DOMAIN-SUFFIX,cloudcode-pa.googleapis.com
