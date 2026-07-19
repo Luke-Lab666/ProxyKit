@@ -1,12 +1,12 @@
 # NAME: CN
 # AUTHOR: Luke-Lab666
 # REPO: https://github.com/Luke-Lab666/ProxyKit
-# UPDATED: 2026-07-18 23:05:18 UTC
+# UPDATED: 2026-07-19 23:06:39 UTC
 # DESC: CN-only public IP CIDR list. Deduplicated and collapsed.
-# COUNT: total=13484, ipv4=7829, ipv6=5655
+# COUNT: total=13485, ipv4=7829, ipv6=5656
 # FORMAT: Surge Rule Set
 # SOURCE:
-#   - https://china-operator-ip.yfgao.com/china46.txt [ok, +5805]
+#   - https://china-operator-ip.yfgao.com/china46.txt [ok, +5808]
 #   - https://gaoyifan.github.io/china-operator-ip/china46.txt [ok, +0]
 #   - https://raw.githubusercontent.com/Hackl0us/GeoIP2-CN/release/CN-ip-cidr.txt [ok, +5412]
 #   - https://raw.githubusercontent.com/carrnot/china-ip-list/release/ip.txt [ok, +7141]
@@ -117,7 +117,6 @@ IP-CIDR,14.192.76.0/22,no-resolve
 IP-CIDR,14.196.0.0/15,no-resolve
 IP-CIDR,14.204.0.0/15,no-resolve
 IP-CIDR,14.208.0.0/12,no-resolve
-IP-CIDR,14.241.232.0/21,no-resolve
 IP-CIDR,14.255.16.0/24,no-resolve
 IP-CIDR,14.255.238.0/24,no-resolve
 IP-CIDR,14.255.254.0/24,no-resolve
@@ -2898,6 +2897,7 @@ IP-CIDR,103.144.109.0/24,no-resolve
 IP-CIDR,103.144.136.0/23,no-resolve
 IP-CIDR,103.144.158.0/23,no-resolve
 IP-CIDR,103.144.240.0/23,no-resolve
+IP-CIDR,103.144.244.0/24,no-resolve
 IP-CIDR,103.145.38.0/23,no-resolve
 IP-CIDR,103.145.42.0/23,no-resolve
 IP-CIDR,103.145.80.0/24,no-resolve
@@ -12229,6 +12229,7 @@ IP-CIDR6,2a0a:6040:d618::/47,no-resolve
 IP-CIDR6,2a0a:6040:d623::/48,no-resolve
 IP-CIDR6,2a0a:6040:d624::/48,no-resolve
 IP-CIDR6,2a0a:6040:d628::/47,no-resolve
+IP-CIDR6,2a0a:6040:d630::/48,no-resolve
 IP-CIDR6,2a0a:6040:e541::/48,no-resolve
 IP-CIDR6,2a0a:6040:e543::/48,no-resolve
 IP-CIDR6,2a0a:6040:e544::/48,no-resolve
