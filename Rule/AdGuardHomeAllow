@@ -1,0 +1,103 @@
+! ==========================================
+! AdGuard Home Allowlist
+! Personal Stable Allowlist
+! ==========================================
+
+
+! ========= Apple =========
+
+apple.com
+icloud.com
+icloud-content.com
+apple-cloudkit.com
+mzstatic.com
+apps.apple.com
+itunes.apple.com
+push.apple.com
+cdn-apple.com
+
+
+! ========= Microsoft =========
+
+microsoft.com
+live.com
+office.com
+office365.com
+outlook.com
+windowsupdate.com
+azureedge.net
+
+
+! ========= Google =========
+
+google.com
+googleapis.com
+gstatic.com
+googleusercontent.com
+ggpht.com
+
+
+! ========= Cloudflare =========
+
+cloudflare.com
+cloudflare-dns.com
+cloudflareinsights.com
+
+
+! ========= Tencent =========
+
+qq.com
+qpic.cn
+qlogo.cn
+gtimg.com
+weixin.qq.com
+wechat.com
+tenpay.com
+
+
+! ========= Alibaba =========
+
+alipay.com
+taobao.com
+tmall.com
+aliyun.com
+alicdn.com
+
+
+! ========= ByteDance =========
+
+douyin.com
+douyincdn.com
+toutiao.com
+bytecdn.cn
+
+
+! ========= Steam / Gaming =========
+
+steampowered.com
+steamcommunity.com
+steamstatic.com
+steamcontent.com
+
+
+! ========= CDN =========
+
+akamai.net
+akamaiedge.net
+fastly.net
+cloudfront.net
+
+
+! ========= Login / OAuth =========
+
+oauth.net
+auth0.com
+okta.com
+
+
+! ========= Common Certificate / Verify =========
+
+letsencrypt.org
+digicert.com
+sectigo.com
+globalsign.com
