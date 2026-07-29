@@ -1,14 +1,14 @@
 # NAME: CN
 # AUTHOR: Luke-Lab666
 # REPO: https://github.com/Luke-Lab666/ProxyKit
-# UPDATED: 2026-07-28 23:13:24 UTC
+# UPDATED: 2026-07-29 23:10:41 UTC
 # DESC: CN-only public IP CIDR list. Deduplicated and collapsed.
-# COUNT: total=13485, ipv4=7837, ipv6=5648
+# COUNT: total=13490, ipv4=7841, ipv6=5649
 # FORMAT: Surge Rule Set
 # SOURCE:
-#   - https://china-operator-ip.yfgao.com/china46.txt [ok, +5806]
+#   - https://china-operator-ip.yfgao.com/china46.txt [ok, +5822]
 #   - https://gaoyifan.github.io/china-operator-ip/china46.txt [ok, +0]
-#   - https://raw.githubusercontent.com/Hackl0us/GeoIP2-CN/release/CN-ip-cidr.txt [ok, +5411]
+#   - https://raw.githubusercontent.com/Hackl0us/GeoIP2-CN/release/CN-ip-cidr.txt [ok, +5412]
 #   - https://raw.githubusercontent.com/carrnot/china-ip-list/release/ip.txt [ok, +7145]
 #   - https://ftp.apnic.net/stats/apnic/delegated-apnic-latest [ok, +3944]
 
@@ -1132,6 +1132,8 @@ IP-CIDR,45.195.189.0/24,no-resolve
 IP-CIDR,45.195.190.0/24,no-resolve
 IP-CIDR,45.196.23.0/24,no-resolve
 IP-CIDR,45.196.75.0/24,no-resolve
+IP-CIDR,45.196.104.0/24,no-resolve
+IP-CIDR,45.196.165.0/24,no-resolve
 IP-CIDR,45.248.8.0/22,no-resolve
 IP-CIDR,45.248.80.0/21,no-resolve
 IP-CIDR,45.248.88.0/22,no-resolve
@@ -4072,6 +4074,7 @@ IP-CIDR,106.80.0.0/12,no-resolve
 IP-CIDR,106.108.0.0/14,no-resolve
 IP-CIDR,106.112.0.0/12,no-resolve
 IP-CIDR,106.224.0.0/12,no-resolve
+IP-CIDR,107.149.27.0/24,no-resolve
 IP-CIDR,107.151.116.0/22,no-resolve
 IP-CIDR,107.151.120.0/21,no-resolve
 IP-CIDR,107.151.212.0/24,no-resolve
@@ -5760,6 +5763,7 @@ IP-CIDR,175.188.0.0/14,no-resolve
 IP-CIDR,176.124.223.0/24,no-resolve
 IP-CIDR,178.83.48.0/24,no-resolve
 IP-CIDR,178.83.220.0/23,no-resolve
+IP-CIDR,178.95.192.0/24,no-resolve
 IP-CIDR,178.248.72.0/24,no-resolve
 IP-CIDR,178.253.252.0/24,no-resolve
 IP-CIDR,180.76.0.0/14,no-resolve
@@ -12661,6 +12665,7 @@ IP-CIDR6,2a0e:aa07:e280::/47,no-resolve
 IP-CIDR6,2a0e:aa07:e284::/46,no-resolve
 IP-CIDR6,2a0e:aa07:e288::/47,no-resolve
 IP-CIDR6,2a0e:aa07:e28b::/48,no-resolve
+IP-CIDR6,2a0e:aa07:e28d::/48,no-resolve
 IP-CIDR6,2a0e:aa07:f001::/48,no-resolve
 IP-CIDR6,2a0e:aa07:f002::/47,no-resolve
 IP-CIDR6,2a0e:aa07:f005::/48,no-resolve
