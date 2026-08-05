@@ -1,11 +1,12 @@
 # NAME: AGI
 # AUTHOR: Luke-Lab666
 # REPO: https://github.com/Luke-Lab666/ProxyKit
-# UPDATED: 2026-08-04 21:44:08 UTC
+# UPDATED: 2026-08-05 21:39:15 UTC
 # DESC: Non-mainland China AI / AGI related domains for Surge.
 # INCLUDE: OpenAI, Copilot, GitHub Copilot, GitHub Models, Gemini, Google Antigravity, Anthropic, JetBrains AI, Meta AI, Perplexity, Mistral AI, Grok AI, Trae AI, OpenRouter, TokenFlux, Groq, Together, Fireworks, Hyperbolic, Jina AI, GPUStack, VoyageAI, Vertex AI, Poe, Cerebras AI, Vercel AI, Hugging Face AI, NVIDIA AI, Kiro, MiniMax International, Z.ai, Xiaomi MiMo.
 # FORMAT: DOMAIN / DOMAIN-SUFFIX
 
+DOMAIN,7h15.ru1353t.1s.m4d3.by.5ukk4w.skk.moe
 DOMAIN,ai.google.dev
 DOMAIN,ai.jetbrains.com
 DOMAIN,ai.meta.com
