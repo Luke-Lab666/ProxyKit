@@ -1,7 +1,7 @@
 # NAME: CN
 # AUTHOR: Luke-Lab666
 # REPO: https://github.com/Luke-Lab666/ProxyKit
-# UPDATED: 2026-08-05 23:15:36 UTC
+# UPDATED: 2026-08-07 01:33:30 UTC
 # DESC: CN-only public IP CIDR list. Deduplicated and collapsed.
 # COUNT: total=13357, ipv4=7799, ipv6=5558
 # FORMAT: Surge Rule Set
@@ -9,7 +9,7 @@
 #   - https://china-operator-ip.yfgao.com/china46.txt [ok, +5814]
 #   - https://gaoyifan.github.io/china-operator-ip/china46.txt [ok, +0]
 #   - https://raw.githubusercontent.com/Hackl0us/GeoIP2-CN/release/CN-ip-cidr.txt [ok, +5413]
-#   - https://raw.githubusercontent.com/carrnot/china-ip-list/release/ip.txt [ok, +7003]
+#   - https://raw.githubusercontent.com/carrnot/china-ip-list/release/ip.txt [ok, +7004]
 #   - https://ftp.apnic.net/stats/apnic/delegated-apnic-latest [ok, +3944]
 
 IP-CIDR,1.0.1.0/24,no-resolve
@@ -120,6 +120,7 @@ IP-CIDR,14.192.76.0/22,no-resolve
 IP-CIDR,14.196.0.0/15,no-resolve
 IP-CIDR,14.204.0.0/15,no-resolve
 IP-CIDR,14.208.0.0/12,no-resolve
+IP-CIDR,14.238.116.0/24,no-resolve
 IP-CIDR,14.255.16.0/24,no-resolve
 IP-CIDR,14.255.238.0/24,no-resolve
 IP-CIDR,14.255.254.0/24,no-resolve
@@ -5873,7 +5874,6 @@ IP-CIDR,188.220.158.0/23,no-resolve
 IP-CIDR,188.221.122.0/23,no-resolve
 IP-CIDR,188.241.80.0/24,no-resolve
 IP-CIDR,189.73.20.0/23,no-resolve
-IP-CIDR,189.75.185.0/24,no-resolve
 IP-CIDR,191.44.76.0/23,no-resolve
 IP-CIDR,191.44.79.0/24,no-resolve
 IP-CIDR,192.6.161.0/24,no-resolve
@@ -12770,7 +12770,7 @@ IP-CIDR6,2a0f:1cc6:b170::/44,no-resolve
 IP-CIDR6,2a0f:1cc6:b180::/43,no-resolve
 IP-CIDR6,2a0f:1cc6:b210::/44,no-resolve
 IP-CIDR6,2a0f:1cc6:b230::/44,no-resolve
-IP-CIDR6,2a0f:1cc6:b240::/44,no-resolve
+IP-CIDR6,2a0f:1cc6:b240::/43,no-resolve
 IP-CIDR6,2a0f:1cc7:ff03::/48,no-resolve
 IP-CIDR6,2a0f:1cc7:ff04::/47,no-resolve
 IP-CIDR6,2a0f:1cc7:ff06::/48,no-resolve
